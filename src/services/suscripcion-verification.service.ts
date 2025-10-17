@@ -1,7 +1,6 @@
 // src/services/suscripcion-verification.service.ts
 
 import { PrismaClient, EstadoSuscripcion } from '@prisma/client';
-import prisma from '../database/prisma';
 
 export class SuscripcionVerificationService {
   constructor(private prisma: PrismaClient = prisma) {}
@@ -31,15 +30,20 @@ export class SuscripcionVerificationService {
     const estadoAnterior = negocio.estadoSuscripcion;
     let estadoActual = estadoAnterior;
     let cambioEstado = false;
+    let fechaVencimiento: Date | null = null;
 
+    // ✅ CORREGIDO: Verificar fecha de vencimiento en la tabla Suscripcion
     // Solo verificar si tiene suscripción activa
-    if (estadoAnterior === EstadoSuscripcion.ACTIVA && negocio.fechaVencimiento) {
+    if (estadoAnterior === EstadoSuscripcion.ACTIVA && negocio.suscripcion) {
+      // La fecha de vencimiento REAL está en Suscripcion, no en Negocio
+      fechaVencimiento = negocio.suscripcion.fechaVencimiento;
+      
       const ahora = new Date();
-      const fechaVencimiento = new Date(negocio.fechaVencimiento);
+      const fechaVencimientoDate = new Date(fechaVencimiento);
 
       // Si la fecha de vencimiento ya pasó
-      if (fechaVencimiento < ahora) {
-        // Actualizar estado a VENCIDA
+      if (fechaVencimientoDate < ahora) {
+        // Actualizar estado del negocio a VENCIDA
         await this.prisma.negocio.update({
           where: { id: negocioId },
           data: {
@@ -47,24 +51,22 @@ export class SuscripcionVerificationService {
           },
         });
 
-        // Si tiene suscripción, marcarla como inactiva
-        if (negocio.suscripcion) {
-          await this.prisma.suscripcion.update({
-            where: { id: negocio.suscripcion.id },
-            data: {
-              activa: false,
-            },
-          });
+        // Marcar la suscripción como inactiva
+        await this.prisma.suscripcion.update({
+          where: { id: negocio.suscripcion.id },
+          data: {
+            activa: false,
+          },
+        });
 
-          // Crear registro en historial
-          await this.prisma.historialSuscripcion.create({
-            data: {
-              suscripcionId: negocio.suscripcion.id,
-              accion: 'VENCIMIENTO',
-              descripcion: `Suscripción vencida el ${fechaVencimiento.toISOString()}`,
-            },
-          });
-        }
+        // Crear registro en historial
+        await this.prisma.historialSuscripcion.create({
+          data: {
+            suscripcionId: negocio.suscripcion.id,
+            accion: 'VENCIMIENTO',
+            descripcion: `Suscripción vencida el ${fechaVencimientoDate.toISOString()}`,
+          },
+        });
 
         estadoActual = EstadoSuscripcion.VENCIDA;
         cambioEstado = true;
@@ -73,10 +75,10 @@ export class SuscripcionVerificationService {
 
     // Calcular días restantes
     let diasRestantes: number | null = null;
-    if (negocio.fechaVencimiento && estadoActual === EstadoSuscripcion.ACTIVA) {
+    if (fechaVencimiento && estadoActual === EstadoSuscripcion.ACTIVA) {
       const ahora = new Date();
-      const fechaVencimiento = new Date(negocio.fechaVencimiento);
-      const diffTime = fechaVencimiento.getTime() - ahora.getTime();
+      const fechaVencimientoDate = new Date(fechaVencimiento);
+      const diffTime = fechaVencimientoDate.getTime() - ahora.getTime();
       diasRestantes = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
 
@@ -84,7 +86,7 @@ export class SuscripcionVerificationService {
       estadoAnterior,
       estadoActual,
       cambioEstado,
-      fechaVencimiento: negocio.fechaVencimiento,
+      fechaVencimiento,
       diasRestantes,
     };
   }
@@ -159,11 +161,12 @@ export class SuscripcionVerificationService {
       estadoActual: EstadoSuscripcion;
     }>;
   }> {
+    // ✅ CORREGIDO: Buscar negocios con suscripción activa (la tabla Suscripcion tiene la fecha real)
     const negocios = await this.prisma.negocio.findMany({
       where: {
         estadoSuscripcion: EstadoSuscripcion.ACTIVA,
-        fechaVencimiento: {
-          not: null,
+        suscripcion: {
+          isNot: null, // Tiene una suscripción
         },
       },
       include: {

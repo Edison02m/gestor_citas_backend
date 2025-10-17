@@ -66,7 +66,6 @@ model Negocio {
   suscripcion       Suscripcion?
   estadoSuscripcion EstadoSuscripcion @default(SIN_SUSCRIPCION)
   fechaRegistro     DateTime          @default(now())
-  fechaVencimiento  DateTime?         // Cuando vence la suscripción (basado en código)
   bloqueado         Boolean           @default(false)
   motivoBloqueo     String?
   codigoAplicado    Boolean           @default(false) // Si ya aplicó un código
@@ -94,7 +93,6 @@ model Negocio {
 
   @@index([usuarioId])
   @@index([estadoSuscripcion])
-  @@index([fechaVencimiento])
   @@index([bloqueado])
   @@index([codigoAplicado])
 }

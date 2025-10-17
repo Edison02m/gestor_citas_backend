@@ -115,6 +115,7 @@ export class AuthService {
     // VERIFICAR ESTADO DE SUSCRIPCIÓN SI TIENE NEGOCIO
     let estadoSuscripcionActual = usuario.negocio?.estadoSuscripcion;
     let diasRestantes: number | null = null;
+    let fechaVencimiento: Date | null = null;
 
     if (usuario.negocio) {
       const verificacion = await this.suscripcionVerification.verificarYActualizarSuscripcion(
@@ -122,6 +123,7 @@ export class AuthService {
       );
       estadoSuscripcionActual = verificacion.estadoActual;
       diasRestantes = verificacion.diasRestantes;
+      fechaVencimiento = verificacion.fechaVencimiento;
 
       // Si cambió el estado, volver a obtener el usuario actualizado
       if (verificacion.cambioEstado) {
@@ -154,7 +156,7 @@ export class AuthService {
                 logo: usuario.negocio.logo,
                 descripcion: usuario.negocio.descripcion,
                 estadoSuscripcion: estadoSuscripcionActual || usuario.negocio.estadoSuscripcion,
-                fechaVencimiento: usuario.negocio.fechaVencimiento,
+                fechaVencimiento: fechaVencimiento,
                 diasRestantes,
               }
             : undefined,
@@ -192,6 +194,7 @@ export class AuthService {
       // VERIFICAR ESTADO DE SUSCRIPCIÓN SI TIENE NEGOCIO
       let estadoSuscripcionActual = usuario.negocio?.estadoSuscripcion;
       let diasRestantes: number | null = null;
+      let fechaVencimiento: Date | null = null;
 
       if (usuario.negocio) {
         const verificacion = await this.suscripcionVerification.verificarYActualizarSuscripcion(
@@ -199,6 +202,7 @@ export class AuthService {
         );
         estadoSuscripcionActual = verificacion.estadoActual;
         diasRestantes = verificacion.diasRestantes;
+        fechaVencimiento = verificacion.fechaVencimiento;
 
         // Si cambió el estado, volver a obtener el usuario actualizado
         if (verificacion.cambioEstado) {
@@ -223,7 +227,7 @@ export class AuthService {
               logo: usuario.negocio.logo,
               descripcion: usuario.negocio.descripcion,
               estadoSuscripcion: estadoSuscripcionActual || usuario.negocio.estadoSuscripcion,
-              fechaVencimiento: usuario.negocio.fechaVencimiento,
+              fechaVencimiento: fechaVencimiento,
               diasRestantes,
             }
           : undefined,
