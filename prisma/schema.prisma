@@ -1,0 +1,608 @@
+// prisma/schema.prisma
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// MÓDULO DE AUTENTICACIÓN Y USUARIOS
+// ============================================================================
+
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  nombre    String
+  rol       String   @default("SUPER_ADMIN")
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([activo])
+}
+
+model Usuario {
+  id          String     @id @default(uuid())
+  email       String     @unique
+  password    String
+  rol         RolUsuario @default(ADMIN_NEGOCIO)
+  primerLogin Boolean    @default(true)
+  activo      Boolean    @default(true)
+  negocio     Negocio?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([email])
+  @@index([rol])
+  @@index([activo])
+}
+
+enum RolUsuario {
+  SUPER_ADMIN
+  ADMIN_NEGOCIO
+}
+
+// ============================================================================
+// MÓDULO DE NEGOCIOS Y SUSCRIPCIONES
+// ============================================================================
+
+model Negocio {
+  id                String            @id @default(uuid())
+  nombre            String
+  telefono          String
+  logo              String?
+  descripcion       String?
+  usuario           Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId         String            @unique
+  
+  // SUSCRIPCIÓN
+  suscripcion       Suscripcion?
+  estadoSuscripcion EstadoSuscripcion @default(SIN_SUSCRIPCION)
+  fechaRegistro     DateTime          @default(now())
+  fechaVencimiento  DateTime?         // Cuando vence la suscripción (basado en código)
+  bloqueado         Boolean           @default(false)
+  motivoBloqueo     String?
+  codigoAplicado    Boolean           @default(false) // Si ya aplicó un código
+  
+  // CONFIGURACIONES DEL NEGOCIO
+  zonaHoraria       String            @default("America/Guayaquil")
+  moneda            String            @default("USD")
+  idioma            String            @default("es")
+  
+  // NOTIFICACIONES
+  notificacionesWhatsApp Boolean       @default(true)
+  notificacionesEmail    Boolean       @default(true)
+  recordatorio24h        Boolean       @default(true)
+  recordatorio1h         Boolean       @default(false)
+  
+  // RELACIONES
+  sucursales        Sucursal[]
+  servicios         Servicio[]
+  empleados         Empleado[]
+  clientes          Cliente[]
+  citas             Cita[]
+  
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([usuarioId])
+  @@index([estadoSuscripcion])
+  @@index([fechaVencimiento])
+  @@index([bloqueado])
+  @@index([codigoAplicado])
+}
+
+model Suscripcion {
+  id                String                   @id @default(uuid())
+  negocio           Negocio                  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId         String                   @unique
+  
+  // Código de suscripción usado
+  codigoSuscripcion CodigoSuscripcion        @relation(fields: [codigoId], references: [id])
+  codigoId          String
+  
+  fechaActivacion   DateTime                 @default(now())
+  fechaVencimiento  DateTime
+  
+  activa            Boolean                  @default(true)
+  renovacionAuto    Boolean                  @default(false)
+  
+  // Historial
+  historial         HistorialSuscripcion[]
+  
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
+
+  @@index([negocioId])
+  @@index([codigoId])
+  @@index([fechaVencimiento])
+  @@index([activa])
+}
+
+model CodigoSuscripcion {
+  id                String           @id @default(uuid())
+  codigo            String           @unique // "MEN-2024-ABC123"
+  
+  // Configuración del plan
+  plan              PlanSuscripcion  @default(MENSUAL)
+  duracionMeses     Int              // 1, 3, 6, 12, etc.
+  descripcion       String?
+  precio            Decimal?         @db.Decimal(10, 2) // Para referencia
+  
+  // Control de uso
+  usado             Boolean          @default(false)
+  fechaUso          DateTime?
+  fechaExpiracion   DateTime?        // El código expira en esta fecha
+  usoMaximo         Int              @default(1)
+  vecesUsado        Int              @default(0)
+  
+  // Auditoría
+  motivoCreacion    String?
+  notas             String?
+  
+  // Relaciones
+  suscripciones     Suscripcion[]
+  
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([codigo])
+  @@index([usado])
+  @@index([plan])
+  @@index([fechaExpiracion])
+}
+
+model HistorialSuscripcion {
+  id              String            @id @default(uuid())
+  suscripcion     Suscripcion       @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  suscripcionId   String
+  
+  accion          AccionSuscripcion
+  descripcion     String
+  codigoUsado     String?
+  realizadoPor    String?           // ID de quien hizo la acción
+  metadata        Json?             // Datos adicionales en formato JSON
+  
+  createdAt       DateTime          @default(now())
+
+  @@index([suscripcionId])
+  @@index([accion])
+  @@index([createdAt])
+}
+
+enum EstadoSuscripcion {
+  SIN_SUSCRIPCION  // Registrado pero sin código aplicado
+  ACTIVA           // Con suscripción activa (código aplicado y vigente)
+  VENCIDA          // Suscripción expiró
+  BLOQUEADA        // Bloqueado por super admin
+  CANCELADA        // Usuario canceló
+}
+
+enum PlanSuscripcion {
+  PRUEBA         // 7 días de prueba
+  MENSUAL        // 1 mes
+  TRIMESTRAL     // 3 meses
+  SEMESTRAL      // 6 meses
+  ANUAL          // 12 meses
+  PERSONALIZADO  // X meses custom
+}
+
+enum AccionSuscripcion {
+  REGISTRO
+  ACTIVACION_CODIGO
+  RENOVACION
+  VENCIMIENTO
+  BLOQUEO
+  DESBLOQUEO
+  CANCELACION
+  CAMBIO_PLAN
+}
+
+// ============================================================================
+// MÓDULO DE CLIENTES
+// ============================================================================
+
+model Cliente {
+  id          String   @id @default(uuid())
+  nombre      String
+  telefono    String
+  email       String?
+  notas       String?  @db.Text
+  
+  // Relación con negocio
+  negocio     Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId   String
+  
+  // Relaciones
+  citas       Cita[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([negocioId, telefono]) // Un teléfono único por negocio
+  @@index([negocioId])
+  @@index([telefono])
+  @@index([email])
+  @@index([nombre])
+}
+
+// ============================================================================
+// MÓDULO DE EMPLEADOS
+// ============================================================================
+
+model Empleado {
+  id          String               @id @default(uuid())
+  nombre      String
+  cargo       String
+  telefono    String
+  email       String
+  foto        String?
+  color       String               @default("#3b82f6") // Color para el calendario
+  estado      EstadoEmpleado       @default(ACTIVO)
+  
+  // Relación con negocio
+  negocio     Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId   String
+  
+  // Relaciones
+  sucursales  EmpleadoSucursal[]
+  horarios    HorarioEmpleado[]
+  bloqueos    BloqueoEmpleado[]
+  citas       Cita[]
+  
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([negocioId])
+  @@index([estado])
+  @@index([nombre])
+}
+
+model HorarioEmpleado {
+  id          String   @id @default(uuid())
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleadoId  String
+  
+  diaSemana   Int      // 0=Domingo, 1=Lunes, 2=Martes, ..., 6=Sábado
+  horaInicio  String   // "09:00"
+  horaFin     String   // "18:00"
+  
+  // Descansos (opcional)
+  tieneDescanso     Boolean @default(false)
+  descansoInicio    String? // "13:00"
+  descansoFin       String? // "14:00"
+
+  @@unique([empleadoId, diaSemana])
+  @@index([empleadoId])
+  @@index([diaSemana])
+}
+
+model BloqueoEmpleado {
+  id          String   @id @default(uuid())
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleadoId  String
+  
+  fechaInicio DateTime
+  fechaFin    DateTime
+  motivo      String?
+  todoElDia   Boolean  @default(true)
+  
+  // Si no es todo el día
+  horaInicio  String?  // "10:00"
+  horaFin     String?  // "12:00"
+  
+  createdAt   DateTime @default(now())
+
+  @@index([empleadoId])
+  @@index([fechaInicio, fechaFin])
+}
+
+enum EstadoEmpleado {
+  ACTIVO
+  INACTIVO
+}
+
+// ============================================================================
+// MÓDULO DE SUCURSALES
+// ============================================================================
+
+model Sucursal {
+  id          String               @id @default(uuid())
+  nombre      String
+  direccion   String
+  ciudad      String
+  provincia   String
+  telefono    String
+  email       String
+  
+  // Coordenadas GPS
+  latitud     Float?
+  longitud    Float?
+  linkMaps    String?              // Generado automáticamente
+  
+  estado      EstadoSucursal       @default(ACTIVA)
+  
+  // Fotos
+  fotos       FotoSucursal[]
+  
+  // Horario general de atención
+  horarios    HorarioSucursal[]
+  
+  // Relación con negocio
+  negocio     Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId   String
+  
+  // Relaciones
+  empleados   EmpleadoSucursal[]
+  servicios   ServicioSucursal[]
+  citas       Cita[]
+  
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([negocioId])
+  @@index([estado])
+  @@index([ciudad])
+}
+
+model HorarioSucursal {
+  id          String   @id @default(uuid())
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId  String
+  
+  diaSemana   Int      // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  abierto     Boolean  @default(true)
+  horaApertura String? // "08:00"
+  horaCierre   String? // "20:00"
+
+  @@unique([sucursalId, diaSemana])
+  @@index([sucursalId])
+}
+
+model FotoSucursal {
+  id          String   @id @default(uuid())
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId  String
+  
+  url         String
+  orden       Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+
+  @@index([sucursalId])
+  @@index([orden])
+}
+
+enum EstadoSucursal {
+  ACTIVA
+  INACTIVA
+}
+
+// ============================================================================
+// MÓDULO DE SERVICIOS
+// ============================================================================
+
+model Servicio {
+  id          String               @id @default(uuid())
+  nombre      String
+  descripcion String               @db.Text
+  duracion    Int                  // Duración en minutos
+  precio      Decimal              @db.Decimal(10, 2)
+  foto        String?
+  estado      EstadoServicio       @default(ACTIVO)
+  
+  // Relación con negocio
+  negocio     Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId   String
+  
+  // Relaciones
+  extras      ServicioExtra[]
+  sucursales  ServicioSucursal[]
+  citas       Cita[]
+  
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([negocioId])
+  @@index([estado])
+  @@index([nombre])
+}
+
+model ServicioExtra {
+  id          String   @id @default(uuid())
+  servicio    Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  servicioId  String
+  
+  nombre      String
+  precio      Decimal  @db.Decimal(10, 2)
+  estado      Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([servicioId])
+  @@index([estado])
+}
+
+enum EstadoServicio {
+  ACTIVO
+  INACTIVO
+}
+
+// ============================================================================
+// MÓDULO DE CITAS
+// ============================================================================
+
+model Cita {
+  id            String       @id @default(uuid())
+  
+  // Información básica
+  fecha         DateTime     @db.Date
+  horaInicio    DateTime     @db.Time
+  horaFin       DateTime     @db.Time
+  
+  estado        EstadoCita   @default(PENDIENTE)
+  notas         String?      @db.Text
+  precioTotal   Decimal      @db.Decimal(10, 2)
+  canalOrigen   CanalOrigen  @default(MANUAL)
+  
+  // Relaciones
+  cliente       Cliente      @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  clienteId     String
+  
+  servicio      Servicio     @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  servicioId    String
+  
+  empleado      Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
+  empleadoId    String
+  
+  sucursal      Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId    String
+  
+  negocio       Negocio      @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId     String
+  
+  // Extras seleccionados (JSON array)
+  extrasSeleccionados Json?  // [{ id: "uuid", nombre: "Extra", precio: 10 }]
+  
+  // Notificaciones
+  notificaciones NotificacionCita[]
+  
+  // Auditoría
+  creadoPor     String?      // ID del usuario que creó la cita
+  modificadoPor String?      // ID del usuario que modificó
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([negocioId])
+  @@index([fecha])
+  @@index([empleadoId, fecha])
+  @@index([sucursalId, fecha])
+  @@index([estado])
+  @@index([clienteId])
+  @@index([servicioId])
+  @@index([canalOrigen])
+}
+
+model NotificacionCita {
+  id          String              @id @default(uuid())
+  cita        Cita                @relation(fields: [citaId], references: [id], onDelete: Cascade)
+  citaId      String
+  
+  tipo        TipoNotificacion
+  canal       CanalNotificacion
+  
+  destinatario String             // Email o teléfono
+  mensaje      String             @db.Text
+  
+  estado      EstadoNotificacion  @default(PENDIENTE)
+  intentos    Int                 @default(0)
+  
+  fechaEnvio  DateTime?
+  error       String?             @db.Text
+  
+  createdAt   DateTime            @default(now())
+
+  @@index([citaId])
+  @@index([estado])
+  @@index([tipo])
+  @@index([fechaEnvio])
+}
+
+enum EstadoCita {
+  PENDIENTE
+  CONFIRMADA
+  COMPLETADA
+  CANCELADA
+  NO_ASISTIO
+}
+
+enum CanalOrigen {
+  MANUAL
+  WEB
+  WHATSAPP
+}
+
+enum TipoNotificacion {
+  CONFIRMACION
+  RECORDATORIO_24H
+  RECORDATORIO_1H
+  CANCELACION
+  REAGENDAMIENTO
+}
+
+enum CanalNotificacion {
+  WHATSAPP
+  EMAIL
+  SMS
+}
+
+enum EstadoNotificacion {
+  PENDIENTE
+  ENVIADO
+  FALLIDO
+  CANCELADO
+}
+
+// ============================================================================
+// TABLAS DE RELACIÓN N:N
+// ============================================================================
+
+model EmpleadoSucursal {
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleadoId  String
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId  String
+  
+  asignadoEn  DateTime @default(now())
+
+  @@id([empleadoId, sucursalId])
+  @@index([empleadoId])
+  @@index([sucursalId])
+}
+
+model ServicioSucursal {
+  servicio    Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  servicioId  String
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId  String
+  
+  disponible  Boolean  @default(true)
+  asignadoEn  DateTime @default(now())
+
+  @@id([servicioId, sucursalId])
+  @@index([servicioId])
+  @@index([sucursalId])
+  @@index([disponible])
+}
+
+// ============================================================================
+// CONFIGURACIONES GLOBALES (Super Admin)
+// ============================================================================
+
+model ConfiguracionGlobal {
+  id          String   @id @default(uuid())
+  clave       String   @unique
+  valor       String   @db.Text
+  tipo        String   // STRING, NUMBER, BOOLEAN, JSON
+  descripcion String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([clave])
+}
+
+// Ejemplo de configuraciones:
+// - DURACION_PRUEBA_GRATIS: "7"
+// - EMAIL_NOTIFICACIONES: "admin@tusaas.com"
+// - MANTENIMIENTO_ACTIVO: "false"
+// - PLANES_DISPONIBLES: '["MENSUAL","TRIMESTRAL","ANUAL"]'

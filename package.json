@@ -1,0 +1,40 @@
+{
+  "name": "gestor-citas-backend",
+  "version": "1.0.0",
+  "description": "Backend para gestor de citas con arquitectura en capas",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "keywords": [
+    "fastify",
+    "prisma",
+    "typescript",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^8.4.2",
+    "@fastify/jwt": "^10.0.0",
+    "@prisma/client": "^5.7.1",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.3.1",
+    "fastify": "^4.25.1",
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^5.7.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.10.6",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}
