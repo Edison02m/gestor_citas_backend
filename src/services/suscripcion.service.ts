@@ -77,30 +77,60 @@ export class SuscripcionService {
 
     // 7. Usar transacción para garantizar consistencia
     const resultado = await this.prisma.$transaction(async (tx) => {
-      // Desactivar suscripciones anteriores (por si acaso)
-      await tx.suscripcion.updateMany({
-        where: {
-          negocioId: negocio.id,
-          activa: true,
-        },
-        data: {
-          activa: false,
-        },
+      // Verificar si ya existe una suscripción para este negocio
+      const suscripcionExistente = await tx.suscripcion.findUnique({
+        where: { negocioId: negocio.id },
       });
 
-      // Crear nueva suscripción
-      const suscripcion = await tx.suscripcion.create({
-        data: {
-          negocioId: negocio.id,
-          codigoId: codigo.id,
-          fechaActivacion,
-          fechaVencimiento,
-          activa: true,
-        },
-        include: {
-          codigoSuscripcion: true,
-        },
-      });
+      let suscripcion;
+
+      if (suscripcionExistente) {
+        // Si existe, actualizar (renovar)
+        suscripcion = await tx.suscripcion.update({
+          where: { negocioId: negocio.id },
+          data: {
+            codigoId: codigo.id,
+            fechaActivacion,
+            fechaVencimiento,
+            activa: true,
+          },
+          include: {
+            codigoSuscripcion: true,
+          },
+        });
+
+        // Crear registro en historial
+        await tx.historialSuscripcion.create({
+          data: {
+            suscripcionId: suscripcion.id,
+            accion: 'RENOVACION',
+            descripcion: `Suscripción renovada con código ${codigo.codigo}`,
+          },
+        });
+      } else {
+        // Si no existe, crear nueva
+        suscripcion = await tx.suscripcion.create({
+          data: {
+            negocioId: negocio.id,
+            codigoId: codigo.id,
+            fechaActivacion,
+            fechaVencimiento,
+            activa: true,
+          },
+          include: {
+            codigoSuscripcion: true,
+          },
+        });
+
+        // Crear registro en historial
+        await tx.historialSuscripcion.create({
+          data: {
+            suscripcionId: suscripcion.id,
+            accion: 'ACTIVACION_CODIGO',
+            descripcion: `Suscripción activada con código ${codigo.codigo}`,
+          },
+        });
+      }
 
       // Actualizar el código (incrementar uso)
       await tx.codigoSuscripcion.update({
@@ -117,7 +147,6 @@ export class SuscripcionService {
         where: { id: negocio.id },
         data: {
           estadoSuscripcion: EstadoSuscripcion.ACTIVA,
-          fechaVencimiento,
           codigoAplicado: true,
         },
       });
