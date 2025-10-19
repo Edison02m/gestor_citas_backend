@@ -15,12 +15,8 @@ export async function usuarioRoutes(fastify: FastifyInstance) {
   const usuarioService = new UsuarioService(usuarioRepository, negocioRepository);
   const usuarioController = new UsuarioController(usuarioService);
 
-  // Rutas públicas (sin autenticación)
   fastify.post('/register', usuarioController.register);
-  // NOTA: El login ahora está en /api/auth/login (unificado)
 
-  // Rutas protegidas (requieren solo autenticación, NO verifican suscripción)
-  // Estas rutas permiten ver/editar perfil incluso sin suscripción activa
   fastify.get(
     '/profile',
     { preHandler: [authMiddleware] },
@@ -31,24 +27,5 @@ export async function usuarioRoutes(fastify: FastifyInstance) {
     '/profile',
     { preHandler: [authMiddleware] },
     usuarioController.updateProfile
-  );
-
-  // Rutas de administración (solo para testing o super admin)
-  fastify.get(
-    '/:id',
-    { preHandler: [authMiddleware] },
-    usuarioController.getById
-  );
-
-  fastify.put(
-    '/:id',
-    { preHandler: [authMiddleware] },
-    usuarioController.update
-  );
-
-  fastify.delete(
-    '/:id',
-    { preHandler: [authMiddleware] },
-    usuarioController.delete
   );
 }

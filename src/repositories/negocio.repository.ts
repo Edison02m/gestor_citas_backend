@@ -82,13 +82,4 @@ export class NegocioRepository {
       data,
     });
   }
-
-  /**
-   * Eliminar negocio
-   */
-  async delete(id: string) {
-    return await this.prisma.negocio.delete({
-      where: { id },
-    });
-  }
 }

@@ -17,31 +17,13 @@ export async function codigoSuscripcionRoutes(fastify: FastifyInstance) {
   fastify.addHook('preHandler', authMiddleware);
   fastify.addHook('preHandler', superAdminMiddleware);
 
-  // Rutas de estadísticas (antes de las rutas con parámetros)
   fastify.get('/estadisticas', controller.getEstadisticas);
-  fastify.get('/proximos-vencer', controller.getProximosAVencer);
 
-  // Crear código
   fastify.post('/', controller.create);
 
-  // Generar múltiples códigos
   fastify.post('/generar-multiples', controller.generarMultiples);
 
-  // Listar códigos
   fastify.get('/', controller.getAll);
 
-  // Validar disponibilidad
-  fastify.post('/validar/:codigo', controller.validarDisponibilidad);
-
-  // Obtener código por código de texto
-  fastify.get('/codigo/:codigo', controller.getByCodigo);
-
-  // Obtener código por ID
-  fastify.get('/:id', controller.getById);
-
-  // Actualizar código
-  fastify.put('/:id', controller.update);
-
-  // Eliminar código
   fastify.delete('/:id', controller.delete);
 }

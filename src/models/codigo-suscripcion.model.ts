@@ -13,14 +13,6 @@ export interface CreateCodigoSuscripcionDto {
   notas?: string;
 }
 
-export interface UpdateCodigoSuscripcionDto {
-  descripcion?: string;
-  precio?: number;
-  fechaExpiracion?: Date;
-  usoMaximo?: number;
-  notas?: string;
-}
-
 export interface CodigoSuscripcionResponse {
   id: string;
   codigo: string;

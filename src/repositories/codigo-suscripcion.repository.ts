@@ -149,54 +149,12 @@ export class CodigoSuscripcionRepository {
     return { codigos, total };
   }
 
-  /**
-   * Actualizar un código
-   */
-  async update(
-    id: string,
-    data: {
-      descripcion?: string;
-      precio?: number;
-      fechaExpiracion?: Date;
-      usoMaximo?: number;
-      notas?: string;
-    }
-  ) {
-    return await this.prisma.codigoSuscripcion.update({
-      where: { id },
-      data: {
-        ...data,
-        precio: data.precio !== undefined ? data.precio : undefined,
-      },
-    });
-  }
-
-  /**
-   * Eliminar un código (solo si no ha sido usado)
-   */
   async delete(id: string) {
     return await this.prisma.codigoSuscripcion.delete({
       where: { id },
     });
   }
 
-  /**
-   * Marcar código como usado
-   */
-  async marcarComoUsado(id: string) {
-    return await this.prisma.codigoSuscripcion.update({
-      where: { id },
-      data: {
-        usado: true,
-        fechaUso: new Date(),
-        vecesUsado: { increment: 1 },
-      },
-    });
-  }
-
-  /**
-   * Verificar si un código existe
-   */
   async codigoExists(codigo: string): Promise<boolean> {
     const count = await this.prisma.codigoSuscripcion.count({
       where: { codigo },
@@ -236,42 +194,5 @@ export class CodigoSuscripcionRepository {
       expirados,
       porPlan,
     };
-  }
-
-  /**
-   * Obtener códigos próximos a vencer
-   */
-  async findProximosAVencer(dias: number = 30) {
-    const fechaLimite = new Date();
-    fechaLimite.setDate(fechaLimite.getDate() + dias);
-
-    return await this.prisma.codigoSuscripcion.findMany({
-      where: {
-        usado: false,
-        fechaExpiracion: {
-          gte: new Date(),
-          lte: fechaLimite,
-        },
-      },
-      orderBy: {
-        fechaExpiracion: 'asc',
-      },
-    });
-  }
-
-  /**
-   * Contar códigos disponibles por plan
-   */
-  async countDisponiblesPorPlan(plan: PlanSuscripcion) {
-    return await this.prisma.codigoSuscripcion.count({
-      where: {
-        plan,
-        usado: false,
-        OR: [
-          { fechaExpiracion: null },
-          { fechaExpiracion: { gte: new Date() } },
-        ],
-      },
-    });
   }
 }

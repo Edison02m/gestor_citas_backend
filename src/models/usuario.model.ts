@@ -40,14 +40,3 @@ export interface UsuarioResponse {
   createdAt: Date;
   updatedAt: Date;
 }
-
-export interface LoginUsuarioDto {
-  email: string;
-  password: string;
-}
-
-export interface LoginUsuarioResponse {
-  token: string;
-  user: UsuarioResponse;
-  requiereCodigoActivacion?: boolean;
-}

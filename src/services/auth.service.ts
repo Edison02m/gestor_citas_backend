@@ -1,5 +1,3 @@
-// src/services/auth.service.ts
-
 import { PrismaClient } from '@prisma/client';
 import { SuperAdminRepository } from '../repositories/superadmin.repository';
 import { UsuarioRepository } from '../repositories/usuario.repository';
@@ -41,29 +39,22 @@ export class AuthService {
     this.suscripcionVerification = new SuscripcionVerificationService(this.prisma);
   }
 
-  /**
-   * Login unificado - Detecta automáticamente si es SuperAdmin o Usuario
-   */
   async login(dto: LoginDto): Promise<LoginResponse> {
     const { email, password } = dto;
 
-    // 1. Intentar primero con SuperAdmin
     const superAdmin = await this.superAdminRepository.findByEmail(email);
 
     if (superAdmin) {
-      // Verificar que esté activo
       if (!superAdmin.activo) {
         throw new Error('Usuario inactivo. Contacte al administrador.');
       }
 
-      // Verificar contraseña
       const isPasswordValid = await comparePassword(password, superAdmin.password);
 
       if (!isPasswordValid) {
         throw new Error('Credenciales inválidas');
       }
 
-      // Generar token
       const token = generateToken({
         id: superAdmin.id,
         email: superAdmin.email,
@@ -86,33 +77,28 @@ export class AuthService {
       };
     }
 
-    // 2. Si no es SuperAdmin, buscar en Usuarios
     let usuario = await this.usuarioRepository.findByEmail(email);
 
     if (!usuario) {
       throw new Error('Credenciales inválidas');
     }
 
-    // Verificar que esté activo
     if (!usuario.activo) {
       throw new Error('Usuario inactivo. Contacte al administrador.');
     }
 
-    // Verificar contraseña
     const isPasswordValid = await comparePassword(password, usuario.password);
 
     if (!isPasswordValid) {
       throw new Error('Credenciales inválidas');
     }
 
-    // Generar token
     const token = generateToken({
       id: usuario.id,
       email: usuario.email,
       rol: usuario.rol,
     });
 
-    // VERIFICAR ESTADO DE SUSCRIPCIÓN SI TIENE NEGOCIO
     let estadoSuscripcionActual = usuario.negocio?.estadoSuscripcion;
     let diasRestantes: number | null = null;
     let fechaVencimiento: Date | null = null;
@@ -125,7 +111,6 @@ export class AuthService {
       diasRestantes = verificacion.diasRestantes;
       fechaVencimiento = verificacion.fechaVencimiento;
 
-      // Si cambió el estado, volver a obtener el usuario actualizado
       if (verificacion.cambioEstado) {
         const usuarioActualizado = await this.usuarioRepository.findById(usuario.id);
         if (usuarioActualizado) {
@@ -134,7 +119,6 @@ export class AuthService {
       }
     }
 
-    // Verificar si requiere código de activación
     const requiereCodigoActivacion =
       usuario.primerLogin && estadoSuscripcionActual === 'SIN_SUSCRIPCION';
 
@@ -167,9 +151,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Obtener información del usuario autenticado (Me)
-   */
   async getMe(userId: string, userRole: string): Promise<any> {
     if (userRole === 'SUPER_ADMIN') {
       const superAdmin = await this.superAdminRepository.findById(userId);
@@ -191,7 +172,6 @@ export class AuthService {
         throw new Error('Usuario no encontrado');
       }
 
-      // VERIFICAR ESTADO DE SUSCRIPCIÓN SI TIENE NEGOCIO
       let estadoSuscripcionActual = usuario.negocio?.estadoSuscripcion;
       let diasRestantes: number | null = null;
       let fechaVencimiento: Date | null = null;
@@ -204,7 +184,6 @@ export class AuthService {
         diasRestantes = verificacion.diasRestantes;
         fechaVencimiento = verificacion.fechaVencimiento;
 
-        // Si cambió el estado, volver a obtener el usuario actualizado
         if (verificacion.cambioEstado) {
           const usuarioActualizado = await this.usuarioRepository.findById(usuario.id);
           if (usuarioActualizado) {

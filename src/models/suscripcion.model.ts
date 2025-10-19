@@ -15,7 +15,6 @@ export interface ActivarCodigoResponse {
     };
     negocio: {
       estadoSuscripcion: string;
-      fechaVencimiento: Date;
     };
   };
   message: string;
