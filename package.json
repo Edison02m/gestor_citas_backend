@@ -23,12 +23,12 @@
   "dependencies": {
     "@fastify/cors": "^8.4.2",
     "@fastify/jwt": "^10.0.0",
-    "@prisma/client": "^5.7.1",
+    "@prisma/client": "^6.17.1",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.3.1",
     "fastify": "^4.25.1",
     "jsonwebtoken": "^9.0.2",
-    "prisma": "^5.7.1"
+    "prisma": "^6.17.1"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

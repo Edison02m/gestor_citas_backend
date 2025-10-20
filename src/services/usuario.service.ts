@@ -1,5 +1,6 @@
 import { UsuarioRepository } from '../repositories/usuario.repository';
 import { NegocioRepository } from '../repositories/negocio.repository';
+import { PrismaClient, PlanSuscripcion } from '@prisma/client';
 import { hashPassword } from '../utils/password.util';
 import {
   CreateUsuarioDto,
@@ -10,7 +11,8 @@ import {
 export class UsuarioService {
   constructor(
     private usuarioRepository: UsuarioRepository,
-    private negocioRepository: NegocioRepository
+    private negocioRepository: NegocioRepository,
+    private prisma: PrismaClient
   ) {}
 
   async register(dto: CreateUsuarioDto): Promise<UsuarioResponse> {
@@ -29,6 +31,10 @@ export class UsuarioService {
     }
 
     if (!dto.nombre || dto.nombre.trim().length < 2) {
+      throw new Error('El nombre del usuario debe tener al menos 2 caracteres');
+    }
+
+    if (!dto.nombreNegocio || dto.nombreNegocio.trim().length < 2) {
       throw new Error('El nombre del negocio debe tener al menos 2 caracteres');
     }
 
@@ -39,20 +45,108 @@ export class UsuarioService {
     const hashedPassword = await hashPassword(dto.password);
 
     try {
-      const usuario = await this.usuarioRepository.create({
-        email: dto.email,
-        password: hashedPassword,
+      // Crear usuario, negocio y suscripción de prueba en una transacción
+      const resultado = await this.prisma.$transaction(async (tx) => {
+        // 1. Crear el usuario
+        const usuario = await tx.usuario.create({
+          data: {
+            nombre: dto.nombre.trim(),
+            email: dto.email,
+            password: hashedPassword,
+          },
+        });
+
+        // 2. Crear el negocio
+        const negocio = await tx.negocio.create({
+          data: {
+            nombre: dto.nombreNegocio.trim(),
+            telefono: dto.telefono.trim(),
+            logo: dto.logo,
+            descripcion: dto.descripcion?.trim(),
+            usuarioId: usuario.id,
+            estadoSuscripcion: 'ACTIVA', // Inicia con suscripción activa
+            codigoAplicado: true, // Ya tiene código aplicado (prueba automática)
+          },
+        });
+
+        // 3. Crear código de suscripción de prueba automático
+        const codigoPrueba = await tx.codigoSuscripcion.create({
+          data: {
+            codigo: `PRUEBA-${Date.now()}-${usuario.id.substring(0, 8)}`,
+            plan: PlanSuscripcion.PRUEBA,
+            duracionMeses: 1, // 30 días = 1 mes
+            descripcion: 'Período de prueba gratuito de 30 días',
+            precio: 0,
+            usado: true,
+            fechaUso: new Date(),
+            vecesUsado: 1,
+            motivoCreacion: 'Registro automático con período de prueba',
+            notas: `Generado automáticamente para ${dto.email}`,
+          },
+        });
+
+        // 4. Crear la suscripción activa
+        const fechaActivacion = new Date();
+        const fechaVencimiento = new Date();
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 30); // 30 días desde hoy
+
+        const suscripcion = await tx.suscripcion.create({
+          data: {
+            negocioId: negocio.id,
+            codigoId: codigoPrueba.id,
+            fechaActivacion,
+            fechaVencimiento,
+            activa: true,
+            renovacionAuto: false,
+          },
+        });
+
+        // 5. Registrar en historial - REGISTRO
+        await tx.historialSuscripcion.create({
+          data: {
+            suscripcionId: suscripcion.id,
+            accion: 'REGISTRO',
+            descripcion: `Nuevo negocio registrado: ${dto.nombreNegocio}. Usuario: ${dto.email}`,
+            codigoUsado: null,
+            realizadoPor: usuario.id,
+            metadata: {
+              nombreNegocio: dto.nombreNegocio,
+              emailUsuario: dto.email,
+              nombreUsuario: dto.nombre,
+            },
+          },
+        });
+
+        // 6. Registrar en historial - ACTIVACION AUTOMÁTICA
+        await tx.historialSuscripcion.create({
+          data: {
+            suscripcionId: suscripcion.id,
+            accion: 'ACTIVACION_CODIGO',
+            descripcion: `Período de prueba de 30 días activado automáticamente. Vence el ${fechaVencimiento.toLocaleDateString('es-ES', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}`,
+            codigoUsado: codigoPrueba.codigo,
+            realizadoPor: usuario.id,
+            metadata: {
+              tipoActivacion: 'automatica',
+              duracionDias: 30,
+              emailUsuario: dto.email,
+              fechaInicio: fechaActivacion.toISOString(),
+              fechaFin: fechaVencimiento.toISOString(),
+            },
+          },
+        });
+
+        // 7. NO cambiar primerLogin aquí - se cambiará cuando complete el onboarding
+        // El usuario tiene suscripción activa pero aún debe configurar su negocio
+        
+        return usuario;
       });
 
-      await this.negocioRepository.create({
-        nombre: dto.nombre.trim(),
-        telefono: dto.telefono.trim(),
-        logo: dto.logo,
-        descripcion: dto.descripcion?.trim(),
-        usuarioId: usuario.id,
-      });
-
-      const usuarioCompleto = await this.usuarioRepository.findById(usuario.id);
+      // Obtener el usuario completo con toda la información
+      const usuarioCompleto = await this.usuarioRepository.findById(resultado.id);
 
       if (!usuarioCompleto || !usuarioCompleto.negocio) {
         throw new Error('Error al crear usuario y negocio');
@@ -96,6 +190,10 @@ export class UsuarioService {
 
     const updateData: any = {};
 
+    if (dto.nombre) {
+      updateData.nombre = dto.nombre;
+    }
+
     if (dto.email) {
       updateData.email = dto.email;
     }
@@ -109,10 +207,10 @@ export class UsuarioService {
 
     await this.usuarioRepository.update(userId, updateData);
 
-    if (dto.nombre || dto.telefono) {
+    if (dto.nombreNegocio || dto.telefono) {
       if (usuario.negocio) {
         await this.negocioRepository.update(usuario.negocio.id, {
-          nombre: dto.nombre,
+          nombre: dto.nombreNegocio,
           telefono: dto.telefono,
         });
       }
@@ -130,6 +228,7 @@ export class UsuarioService {
   private toResponse(usuario: any): UsuarioResponse {
     return {
       id: usuario.id,
+      nombre: usuario.nombre,
       email: usuario.email,
       rol: usuario.rol,
       primerLogin: usuario.primerLogin,

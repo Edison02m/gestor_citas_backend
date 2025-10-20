@@ -119,8 +119,11 @@ export class AuthService {
       }
     }
 
+    // Requiere código si no tiene suscripción activa (sin importar si es primer login o no)
+    // Los usuarios nuevos ya tienen prueba automática, así que esto aplica solo para usuarios
+    // cuya suscripción expiró o nunca activaron una después de la prueba
     const requiereCodigoActivacion =
-      usuario.primerLogin && estadoSuscripcionActual === 'SIN_SUSCRIPCION';
+      estadoSuscripcionActual === 'SIN_SUSCRIPCION' || estadoSuscripcionActual === 'VENCIDA';
 
     return {
       success: true,
@@ -128,6 +131,7 @@ export class AuthService {
         token,
         user: {
           id: usuario.id,
+          nombre: usuario.nombre,
           email: usuario.email,
           rol: usuario.rol,
           primerLogin: usuario.primerLogin,
@@ -194,6 +198,7 @@ export class AuthService {
 
       return {
         id: usuario.id,
+        nombre: usuario.nombre,
         email: usuario.email,
         rol: usuario.rol,
         primerLogin: usuario.primerLogin,

@@ -6,6 +6,8 @@ import { superAdminRoutes } from './routes/superadmin.routes';
 import { codigoSuscripcionRoutes } from './routes/codigo-suscripcion.routes';
 import { usuarioRoutes } from './routes/usuario.routes';
 import { suscripcionRoutes } from './routes/suscripcion.routes';
+import { onboardingRoutes } from './routes/onboarding.routes';
+import { sucursalRoutes } from './routes/sucursal.routes';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -36,6 +38,12 @@ app.register(usuarioRoutes, { prefix: '/api/usuarios' });
 
 // Registrar rutas de suscripciones
 app.register(suscripcionRoutes, { prefix: '/api/suscripciones' });
+
+// Registrar rutas de onboarding
+app.register(onboardingRoutes, { prefix: '/api/onboarding' });
+
+// Registrar rutas de sucursales
+app.register(sucursalRoutes, { prefix: '/api' });
 
 const start = async () => {
   try {

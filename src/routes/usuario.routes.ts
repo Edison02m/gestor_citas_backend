@@ -12,7 +12,7 @@ export async function usuarioRoutes(fastify: FastifyInstance) {
   // ✅ Usar singleton de PrismaClient
   const usuarioRepository = new UsuarioRepository(prisma);
   const negocioRepository = new NegocioRepository(prisma);
-  const usuarioService = new UsuarioService(usuarioRepository, negocioRepository);
+  const usuarioService = new UsuarioService(usuarioRepository, negocioRepository, prisma);
   const usuarioController = new UsuarioController(usuarioService);
 
   fastify.post('/register', usuarioController.register);

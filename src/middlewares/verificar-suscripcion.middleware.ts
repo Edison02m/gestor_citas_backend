@@ -5,7 +5,7 @@ import { SuscripcionVerificationService } from '../services/suscripcion-verifica
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const verificacionService = new SuscripcionVerificationService();
+const verificacionService = new SuscripcionVerificationService(prisma);
 
 /**
  * Middleware que verifica el estado de suscripción en CADA petición

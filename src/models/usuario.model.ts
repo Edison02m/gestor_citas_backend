@@ -4,20 +4,22 @@ import { RolUsuario } from '@prisma/client';
 
 export interface CreateUsuarioDto {
   // Datos del usuario
+  nombre: string;
   email: string;
   password: string;
   
   // Datos del negocio
-  nombre: string;
+  nombreNegocio: string;
   telefono: string;
   logo?: string;
   descripcion?: string;
 }
 
 export interface UpdateUsuarioDto {
+  nombre?: string;
   email?: string;
   password?: string;
-  nombre?: string;
+  nombreNegocio?: string;
   telefono?: string;
   logo?: string;
   descripcion?: string;
@@ -25,6 +27,7 @@ export interface UpdateUsuarioDto {
 
 export interface UsuarioResponse {
   id: string;
+  nombre: string;
   email: string;
   rol: RolUsuario;
   primerLogin: boolean;

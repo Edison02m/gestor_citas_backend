@@ -9,12 +9,14 @@ export class UsuarioRepository {
    * Crear un usuario
    */
   async create(data: {
+    nombre: string;
     email: string;
     password: string;
     rol?: RolUsuario;
   }) {
     return await this.prisma.usuario.create({
       data: {
+        nombre: data.nombre,
         email: data.email,
         password: data.password,
         rol: data.rol || RolUsuario.ADMIN_NEGOCIO,
@@ -85,6 +87,7 @@ export class UsuarioRepository {
   async update(
     id: string,
     data: {
+      nombre?: string;
       email?: string;
       password?: string;
       activo?: boolean;

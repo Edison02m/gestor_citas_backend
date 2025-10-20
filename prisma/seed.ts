@@ -10,17 +10,7 @@ async function seed() {
   const service = new SuperAdminService();
 
   try {
-    // Verificar si ya existe un super admin
-    const existing = await service.getAll();
 
-    if (existing.length > 0) {
-      console.log('✅ Ya existe al menos un Super Admin');
-      console.log(`   Total: ${existing.length}`);
-      existing.forEach(sa => {
-        console.log(`   - ${sa.email} (${sa.activo ? 'Activo' : 'Inactivo'})`);
-      });
-      return;
-    }
 
     // Crear el primer super admin
     console.log('📝 Creando el primer Super Admin...');
