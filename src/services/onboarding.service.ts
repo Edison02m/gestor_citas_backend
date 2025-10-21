@@ -20,9 +20,13 @@ export class OnboardingService {
       where: { id: negocioId },
       include: {
         usuario: { select: { primerLogin: true } },
-        sucursales: true,
-        servicios: true,
-        empleados: true,
+        _count: {
+          select: {
+            sucursales: true,
+            servicios: true,
+            empleados: true,
+          }
+        }
       },
     });
 
@@ -30,9 +34,9 @@ export class OnboardingService {
       throw new Error('Negocio no encontrado');
     }
 
-    const tieneSucursales = negocio.sucursales.length > 0;
-    const tieneServicios = negocio.servicios.length > 0;
-    const tieneEmpleados = negocio.empleados.length > 0;
+    const tieneSucursales = negocio._count.sucursales > 0;
+    const tieneServicios = negocio._count.servicios > 0;
+    const tieneEmpleados = negocio._count.empleados > 0;
 
     // Determinar paso actual
     let pasoActual = 1;
@@ -95,10 +99,23 @@ export class OnboardingService {
     // Validar que el negocio existe
     const negocio = await this.prisma.negocio.findUnique({
       where: { id: negocioId },
+      select: { id: true }
     });
 
     if (!negocio) {
       throw new Error('Negocio no encontrado');
+    }
+
+    // Validar que no exista una sucursal con el mismo nombre
+    const sucursalExistente = await this.prisma.sucursal.findFirst({
+      where: { 
+        negocioId, 
+        nombre: dto.nombre 
+      },
+    });
+
+    if (sucursalExistente) {
+      throw new Error(`Ya existe una sucursal con el nombre "${dto.nombre}"`);
     }
 
     // Validar que se envíen horarios para todos los días (0-6)
@@ -151,13 +168,13 @@ export class OnboardingService {
    * PASO 3: Crear servicio con extras y asignar a sucursales
    */
   async crearServicio(negocioId: string, dto: OnboardingServicioDto) {
-    // Validar que el negocio tiene sucursales
-    const sucursales = await this.prisma.sucursal.findMany({
-      where: { negocioId },
-    });
+    // Validar precio y duración primero (fail fast)
+    if (dto.precio <= 0) {
+      throw new Error('El precio debe ser mayor a 0');
+    }
 
-    if (sucursales.length === 0) {
-      throw new Error('Debes crear al menos una sucursal antes de agregar servicios');
+    if (dto.duracion <= 0) {
+      throw new Error('La duración debe ser mayor a 0 minutos');
     }
 
     // Validar que se envíen sucursales
@@ -165,22 +182,30 @@ export class OnboardingService {
       throw new Error('Debes asignar el servicio a al menos una sucursal');
     }
 
-    // Validar que las sucursales seleccionadas existen y pertenecen al negocio
-    const sucursalesValidas = sucursales.filter((s) =>
-      dto.sucursalIds.includes(s.id)
-    );
+    // Validar duplicados y existencia en una sola consulta
+    const [servicioExistente, countSucursales] = await Promise.all([
+      this.prisma.servicio.findFirst({
+        where: { negocioId, nombre: dto.nombre },
+        select: { id: true }
+      }),
+      this.prisma.sucursal.count({
+        where: {
+          negocioId,
+          id: { in: dto.sucursalIds }
+        }
+      })
+    ]);
 
-    if (sucursalesValidas.length !== dto.sucursalIds.length) {
+    if (servicioExistente) {
+      throw new Error(`Ya existe un servicio con el nombre "${dto.nombre}"`);
+    }
+
+    if (countSucursales === 0) {
+      throw new Error('Debes crear al menos una sucursal antes de agregar servicios');
+    }
+
+    if (countSucursales !== dto.sucursalIds.length) {
       throw new Error('Una o más sucursales especificadas no existen o no pertenecen a tu negocio');
-    }
-
-    // Validar precio y duración
-    if (dto.precio <= 0) {
-      throw new Error('El precio debe ser mayor a 0');
-    }
-
-    if (dto.duracion <= 0) {
-      throw new Error('La duración debe ser mayor a 0 minutos');
     }
 
     return await this.prisma.$transaction(async (tx) => {
@@ -224,26 +249,34 @@ export class OnboardingService {
    * PASO 4: Crear empleado con horarios y asignar a sucursales (OPCIONAL)
    */
   async crearEmpleado(negocioId: string, dto: OnboardingEmpleadoDto) {
-    // Validar que el negocio tiene sucursales
-    const sucursales = await this.prisma.sucursal.findMany({
-      where: { negocioId },
-    });
-
-    if (sucursales.length === 0) {
-      throw new Error('Debes crear al menos una sucursal antes de agregar empleados');
-    }
-
     // Validar que se envíen sucursales
     if (!dto.sucursalIds || dto.sucursalIds.length === 0) {
       throw new Error('Debes asignar el empleado a al menos una sucursal');
     }
 
-    // Validar que las sucursales existen y pertenecen al negocio
-    const sucursalesValidas = sucursales.filter((s) =>
-      dto.sucursalIds.includes(s.id)
-    );
+    // Validar email único y sucursales en paralelo
+    const [empleadoExistente, countSucursales] = await Promise.all([
+      this.prisma.empleado.findFirst({
+        where: { negocioId, email: dto.email },
+        select: { id: true }
+      }),
+      this.prisma.sucursal.count({
+        where: {
+          negocioId,
+          id: { in: dto.sucursalIds }
+        }
+      })
+    ]);
 
-    if (sucursalesValidas.length !== dto.sucursalIds.length) {
+    if (empleadoExistente) {
+      throw new Error(`Ya existe un empleado con el email "${dto.email}"`);
+    }
+
+    if (countSucursales === 0) {
+      throw new Error('Debes crear al menos una sucursal antes de agregar empleados');
+    }
+
+    if (countSucursales !== dto.sucursalIds.length) {
       throw new Error('Una o más sucursales especificadas no existen o no pertenecen a tu negocio');
     }
 
@@ -294,30 +327,30 @@ export class OnboardingService {
    * PASO 5: Completar onboarding
    */
   async completarOnboarding(usuarioId: string, negocioId: string) {
-    // Validar que tiene al menos 1 sucursal y 1 servicio
-    const negocio = await this.prisma.negocio.findUnique({
-      where: { id: negocioId },
-      include: {
-        usuario: { select: { primerLogin: true } },
-        sucursales: true,
-        servicios: true,
-      },
-    });
+    // Validar que tiene al menos 1 sucursal y 1 servicio con count (más eficiente)
+    const [usuario, countSucursales, countServicios] = await Promise.all([
+      this.prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: { primerLogin: true }
+      }),
+      this.prisma.sucursal.count({ where: { negocioId } }),
+      this.prisma.servicio.count({ where: { negocioId } })
+    ]);
 
-    if (!negocio) {
-      throw new Error('Negocio no encontrado');
+    if (!usuario) {
+      throw new Error('Usuario no encontrado');
     }
 
     // Validar que efectivamente es primer login
-    if (!negocio.usuario?.primerLogin) {
+    if (!usuario.primerLogin) {
       throw new Error('El onboarding ya fue completado anteriormente');
     }
 
-    if (negocio.sucursales.length === 0) {
+    if (countSucursales === 0) {
       throw new Error('Debes crear al menos una sucursal para completar la configuración');
     }
 
-    if (negocio.servicios.length === 0) {
+    if (countServicios === 0) {
       throw new Error('Debes crear al menos un servicio para completar la configuración');
     }
 
@@ -357,111 +390,114 @@ export class OnboardingService {
     }
 
     return await this.prisma.$transaction(async (tx) => {
-      const sucursalesCreadas: any[] = [];
-      const serviciosCreados: any[] = [];
-      const empleadosCreados: any[] = [];
-
-      // 1. Crear sucursales
-      for (const sucursalDto of dto.sucursales) {
-        const sucursal = await tx.sucursal.create({
-          data: {
-            nombre: sucursalDto.nombre,
-            direccion: sucursalDto.direccion,
-            ciudad: sucursalDto.ciudad,
-            provincia: sucursalDto.provincia,
-            telefono: sucursalDto.telefono,
-            email: sucursalDto.email,
-            negocioId,
-          },
-        });
-
-        await tx.horarioSucursal.createMany({
-          data: sucursalDto.horarios.map((h) => ({
-            sucursalId: sucursal.id,
-            diaSemana: h.diaSemana,
-            abierto: h.abierto,
-            horaApertura: h.abierto ? h.horaApertura : null,
-            horaCierre: h.abierto ? h.horaCierre : null,
-          })),
-        });
-
-        sucursalesCreadas.push(sucursal);
-      }
-
-      // 2. Crear servicios
-      for (const servicioDto of dto.servicios) {
-        const servicio = await tx.servicio.create({
-          data: {
-            nombre: servicioDto.nombre,
-            descripcion: servicioDto.descripcion,
-            duracion: servicioDto.duracion,
-            precio: servicioDto.precio,
-            foto: servicioDto.foto,
-            negocioId,
-          },
-        });
-
-        if (servicioDto.extras && servicioDto.extras.length > 0) {
-          await tx.servicioExtra.createMany({
-            data: servicioDto.extras.map((extra) => ({
-              servicioId: servicio.id,
-              nombre: extra.nombre,
-              precio: extra.precio,
-            })),
-          });
-        }
-
-        await tx.servicioSucursal.createMany({
-          data: servicioDto.sucursalIds.map((sucursalId) => ({
-            servicioId: servicio.id,
-            sucursalId,
-            disponible: true,
-          })),
-        });
-
-        serviciosCreados.push(servicio);
-      }
-
-      // 3. Crear empleados (opcional)
-      if (dto.empleados && dto.empleados.length > 0) {
-        for (const empleadoDto of dto.empleados) {
-          const empleado = await tx.empleado.create({
+      // 1. Crear todas las sucursales en paralelo
+      const sucursalesCreadas = await Promise.all(
+        dto.sucursales.map(async (sucursalDto) => {
+          const sucursal = await tx.sucursal.create({
             data: {
-              nombre: empleadoDto.nombre,
-              cargo: empleadoDto.cargo,
-              telefono: empleadoDto.telefono,
-              email: empleadoDto.email,
-              foto: empleadoDto.foto,
-              color: empleadoDto.color || '#3b82f6',
+              nombre: sucursalDto.nombre,
+              direccion: sucursalDto.direccion,
+              ciudad: sucursalDto.ciudad,
+              provincia: sucursalDto.provincia,
+              telefono: sucursalDto.telefono,
+              email: sucursalDto.email,
               negocioId,
             },
           });
 
-          if (empleadoDto.horarios && empleadoDto.horarios.length > 0) {
-            await tx.horarioEmpleado.createMany({
-              data: empleadoDto.horarios.map((h) => ({
-                empleadoId: empleado.id,
-                diaSemana: h.diaSemana,
-                horaInicio: h.horaInicio,
-                horaFin: h.horaFin,
-                tieneDescanso: h.tieneDescanso,
-                descansoInicio: h.tieneDescanso ? h.descansoInicio : null,
-                descansoFin: h.tieneDescanso ? h.descansoFin : null,
+          await tx.horarioSucursal.createMany({
+            data: sucursalDto.horarios.map((h) => ({
+              sucursalId: sucursal.id,
+              diaSemana: h.diaSemana,
+              abierto: h.abierto,
+              horaApertura: h.abierto ? h.horaApertura : null,
+              horaCierre: h.abierto ? h.horaCierre : null,
+            })),
+          });
+
+          return sucursal;
+        })
+      );
+
+      // 2. Crear todos los servicios en paralelo
+      const serviciosCreados = await Promise.all(
+        dto.servicios.map(async (servicioDto) => {
+          const servicio = await tx.servicio.create({
+            data: {
+              nombre: servicioDto.nombre,
+              descripcion: servicioDto.descripcion,
+              duracion: servicioDto.duracion,
+              precio: servicioDto.precio,
+              foto: servicioDto.foto,
+              negocioId,
+            },
+          });
+
+          if (servicioDto.extras && servicioDto.extras.length > 0) {
+            await tx.servicioExtra.createMany({
+              data: servicioDto.extras.map((extra) => ({
+                servicioId: servicio.id,
+                nombre: extra.nombre,
+                precio: extra.precio,
               })),
             });
           }
 
-          if (empleadoDto.sucursalIds && empleadoDto.sucursalIds.length > 0) {
-            await tx.empleadoSucursal.createMany({
-              data: empleadoDto.sucursalIds.map((sucursalId) => ({
-                empleadoId: empleado.id,
-                sucursalId,
-              })),
-            });
-          }
+          await tx.servicioSucursal.createMany({
+            data: servicioDto.sucursalIds.map((sucursalId) => ({
+              servicioId: servicio.id,
+              sucursalId,
+              disponible: true,
+            })),
+          });
 
-          empleadosCreados.push(empleado);
-        }
+          return servicio;
+        })
+      );
+
+      // 3. Crear empleados (opcional) en paralelo
+      let empleadosCreados: any[] = [];
+      if (dto.empleados && dto.empleados.length > 0) {
+        empleadosCreados = await Promise.all(
+          dto.empleados.map(async (empleadoDto) => {
+            const empleado = await tx.empleado.create({
+              data: {
+                nombre: empleadoDto.nombre,
+                cargo: empleadoDto.cargo,
+                telefono: empleadoDto.telefono,
+                email: empleadoDto.email,
+                foto: empleadoDto.foto,
+                color: empleadoDto.color || '#3b82f6',
+                negocioId,
+              },
+            });
+
+            if (empleadoDto.horarios && empleadoDto.horarios.length > 0) {
+              await tx.horarioEmpleado.createMany({
+                data: empleadoDto.horarios.map((h) => ({
+                  empleadoId: empleado.id,
+                  diaSemana: h.diaSemana,
+                  horaInicio: h.horaInicio,
+                  horaFin: h.horaFin,
+                  tieneDescanso: h.tieneDescanso,
+                  descansoInicio: h.tieneDescanso ? h.descansoInicio : null,
+                  descansoFin: h.tieneDescanso ? h.descansoFin : null,
+                })),
+              });
+            }
+
+            if (empleadoDto.sucursalIds && empleadoDto.sucursalIds.length > 0) {
+              await tx.empleadoSucursal.createMany({
+                data: empleadoDto.sucursalIds.map((sucursalId) => ({
+                  empleadoId: empleado.id,
+                  sucursalId,
+                })),
+              });
+            }
+
+            return empleado;
+          })
+        );
       }
 
       // 4. Completar onboarding
