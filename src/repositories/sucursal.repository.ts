@@ -82,6 +82,7 @@ export class SucursalRepository {
         ...(data.provincia !== undefined && { provincia: data.provincia }),
         ...(data.telefono !== undefined && { telefono: data.telefono }),
         ...(data.email !== undefined && { email: data.email }),
+        ...(data.estado !== undefined && { estado: data.estado as any }),
       },
       include: {
         horarios: {

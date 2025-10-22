@@ -17,6 +17,7 @@ export interface SucursalUpdateDto {
   provincia?: string | null;
   telefono?: string;
   email?: string | null;
+  estado?: string; // "ACTIVA" | "INACTIVA"
 }
 
 export interface HorarioSucursalDto {

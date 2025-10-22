@@ -9,6 +9,7 @@ import { suscripcionRoutes } from './routes/suscripcion.routes';
 import { onboardingRoutes } from './routes/onboarding.routes';
 import { sucursalRoutes } from './routes/sucursal.routes';
 import { clienteRoutes } from './routes/cliente.routes';
+import { empleadoRoutes } from './routes/empleado.routes';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -48,6 +49,9 @@ app.register(sucursalRoutes, { prefix: '/api' });
 
 // Registrar rutas de clientes
 app.register(clienteRoutes, { prefix: '/api/clientes' });
+
+// Registrar rutas de empleados
+app.register(empleadoRoutes, { prefix: '/api/empleados' });
 
 const start = async () => {
   try {

@@ -146,6 +146,13 @@ export class SucursalService {
       throw new Error('El teléfono no puede estar vacío');
     }
 
+    // Validar estado si se proporciona
+    if (dto.estado !== undefined) {
+      if (!['ACTIVA', 'INACTIVA'].includes(dto.estado)) {
+        throw new Error('El estado debe ser ACTIVA o INACTIVA');
+      }
+    }
+
     // Limpiar datos
     const dataLimpia: SucursalUpdateDto = {};
     if (dto.nombre !== undefined) dataLimpia.nombre = dto.nombre.trim();
@@ -154,6 +161,7 @@ export class SucursalService {
     if (dto.provincia !== undefined) dataLimpia.provincia = dto.provincia?.trim() || null;
     if (dto.telefono !== undefined) dataLimpia.telefono = dto.telefono.trim();
     if (dto.email !== undefined) dataLimpia.email = dto.email?.trim() || null;
+    if (dto.estado !== undefined) dataLimpia.estado = dto.estado;
 
     const sucursal = await this.sucursalRepository.update(id, dataLimpia);
     return this.toResponse(sucursal);
