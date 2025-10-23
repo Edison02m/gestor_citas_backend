@@ -6,7 +6,6 @@ export interface EmpleadoDto {
   telefono: string;
   email: string;
   foto?: string;
-  color?: string;
 }
 
 export interface EmpleadoResponse {
@@ -16,7 +15,6 @@ export interface EmpleadoResponse {
   telefono: string;
   email: string;
   foto?: string | null;
-  color: string;
   estado: string;
   negocioId: string;
   horarios?: HorarioEmpleadoResponse[];
@@ -30,7 +28,6 @@ export interface EmpleadoUpdateDto {
   telefono?: string;
   email?: string;
   foto?: string | null;
-  color?: string;
   estado?: string;
 }
 

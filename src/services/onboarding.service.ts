@@ -135,6 +135,25 @@ export class OnboardingService {
       throw new Error('Los días de la semana deben estar entre 0 (Domingo) y 6 (Sábado)');
     }
 
+    // Validar horarios de descanso
+    for (const horario of dto.horarios) {
+      if (horario.abierto && horario.tieneDescanso) {
+        if (!horario.descansoInicio || !horario.descansoFin) {
+          throw new Error(`El día ${horario.diaSemana} tiene descanso activado pero falta la hora de inicio o fin del descanso`);
+        }
+
+        // Validar que el descanso esté dentro del horario de apertura
+        if (horario.horaApertura && horario.horaCierre) {
+          if (horario.descansoInicio <= horario.horaApertura || horario.descansoFin >= horario.horaCierre) {
+            throw new Error(`El descanso del día ${horario.diaSemana} debe estar dentro del horario de apertura`);
+          }
+          if (horario.descansoInicio >= horario.descansoFin) {
+            throw new Error(`La hora de inicio del descanso debe ser menor que la hora de fin en el día ${horario.diaSemana}`);
+          }
+        }
+      }
+    }
+
     // Crear sucursal con horarios en una transacción
     return await this.prisma.$transaction(async (tx) => {
       const sucursal = await tx.sucursal.create({
@@ -157,6 +176,9 @@ export class OnboardingService {
           abierto: h.abierto,
           horaApertura: h.abierto ? h.horaApertura : null,
           horaCierre: h.abierto ? h.horaCierre : null,
+          tieneDescanso: h.abierto ? h.tieneDescanso : false,
+          descansoInicio: (h.abierto && h.tieneDescanso) ? h.descansoInicio : null,
+          descansoFin: (h.abierto && h.tieneDescanso) ? h.descansoFin : null,
         })),
       });
 
@@ -217,20 +239,10 @@ export class OnboardingService {
           duracion: dto.duracion,
           precio: dto.precio,
           foto: dto.foto,
+          color: dto.color || '#3b82f6',
           negocioId,
         },
       });
-
-      // Crear extras si hay
-      if (dto.extras && dto.extras.length > 0) {
-        await tx.servicioExtra.createMany({
-          data: dto.extras.map((extra) => ({
-            servicioId: servicio.id,
-            nombre: extra.nombre,
-            precio: extra.precio,
-          })),
-        });
-      }
 
       // Asignar a sucursales
       await tx.servicioSucursal.createMany({
@@ -289,7 +301,6 @@ export class OnboardingService {
           telefono: dto.telefono,
           email: dto.email,
           foto: dto.foto,
-          color: dto.color || '#3b82f6',
           negocioId,
         },
       });
@@ -429,19 +440,10 @@ export class OnboardingService {
               duracion: servicioDto.duracion,
               precio: servicioDto.precio,
               foto: servicioDto.foto,
+              color: servicioDto.color || '#3b82f6',
               negocioId,
             },
           });
-
-          if (servicioDto.extras && servicioDto.extras.length > 0) {
-            await tx.servicioExtra.createMany({
-              data: servicioDto.extras.map((extra) => ({
-                servicioId: servicio.id,
-                nombre: extra.nombre,
-                precio: extra.precio,
-              })),
-            });
-          }
 
           await tx.servicioSucursal.createMany({
             data: servicioDto.sucursalIds.map((sucursalId) => ({
@@ -467,7 +469,6 @@ export class OnboardingService {
                 telefono: empleadoDto.telefono,
                 email: empleadoDto.email,
                 foto: empleadoDto.foto,
-                color: empleadoDto.color || '#3b82f6',
                 negocioId,
               },
             });

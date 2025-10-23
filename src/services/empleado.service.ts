@@ -94,14 +94,6 @@ export class EmpleadoService {
       );
     }
 
-    // Validar color si se proporciona
-    if (dto.color) {
-      const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-      if (!colorRegex.test(dto.color)) {
-        throw new Error('El formato del color no es válido (debe ser hexadecimal, ej: #3b82f6)');
-      }
-    }
-
     // Crear empleado
     return await this.repository.create(negocioId, {
       nombre: dto.nombre.trim(),
@@ -109,7 +101,6 @@ export class EmpleadoService {
       telefono: telefonoLimpio,
       email: dto.email.trim().toLowerCase(),
       foto: dto.foto?.trim(),
-      color: dto.color || '#3b82f6',
     });
   }
 
@@ -191,14 +182,6 @@ export class EmpleadoService {
       }
 
       dto.email = dto.email.trim().toLowerCase();
-    }
-
-    // Validar color si se proporciona
-    if (dto.color !== undefined) {
-      const colorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-      if (!colorRegex.test(dto.color)) {
-        throw new Error('El formato del color no es válido (debe ser hexadecimal, ej: #3b82f6)');
-      }
     }
 
     // Validar estado si se proporciona

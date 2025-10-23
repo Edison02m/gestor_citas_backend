@@ -34,6 +34,9 @@ export interface OnboardingSucursalDto {
     abierto: boolean;
     horaApertura?: string; // "08:00"
     horaCierre?: string;   // "20:00"
+    tieneDescanso: boolean;
+    descansoInicio?: string; // "13:00"
+    descansoFin?: string;    // "14:00"
   }[];
 }
 
@@ -47,12 +50,7 @@ export interface OnboardingServicioDto {
   duracion: number; // minutos
   precio: number;
   foto?: string;
-  
-  // Extras opcionales
-  extras?: {
-    nombre: string;
-    precio: number;
-  }[];
+  color?: string; // Color para el calendario, ej: "#ff5733"
   
   // ¿En qué sucursales está disponible?
   sucursalIds: string[]; // ["uuid-sucursal-1", "uuid-sucursal-2"]
@@ -68,7 +66,6 @@ export interface OnboardingEmpleadoDto {
   telefono: string;
   email: string;
   foto?: string;
-  color?: string; // Para calendario, ej: "#ff5733"
   
   // Horarios del empleado
   horarios: {

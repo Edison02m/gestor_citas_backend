@@ -246,7 +246,6 @@ model Empleado {
   telefono String
   email    String
   foto     String?
-  color    String         @default("#3b82f6") // Color para el calendario
   estado   EstadoEmpleado @default(ACTIVO)
 
   // Relación con negocio
@@ -381,6 +380,7 @@ model Servicio {
   duracion    Int // Duración en minutos
   precio      Decimal        @db.Decimal(10, 2)
   foto        String?
+  color       String         @default("#3b82f6") // Color para el calendario
   estado      EstadoServicio @default(ACTIVO)
 
   // Relación con negocio
@@ -388,7 +388,6 @@ model Servicio {
   negocioId String
 
   // Relaciones
-  extras     ServicioExtra[]
   sucursales ServicioSucursal[]
   citas      Cita[]
 
@@ -398,22 +397,6 @@ model Servicio {
   @@index([negocioId])
   @@index([estado])
   @@index([nombre])
-}
-
-model ServicioExtra {
-  id         String   @id @default(uuid())
-  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-  servicioId String
-
-  nombre String
-  precio Decimal @db.Decimal(10, 2)
-  estado Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([servicioId])
-  @@index([estado])
 }
 
 enum EstadoServicio {
