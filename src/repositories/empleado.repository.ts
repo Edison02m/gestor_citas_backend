@@ -96,7 +96,6 @@ export class EmpleadoRepository {
         telefono: data.telefono,
         email: data.email,
         foto: data.foto,
-        color: data.color || '#3b82f6',
         negocioId,
       },
       include: {
@@ -117,7 +116,6 @@ export class EmpleadoRepository {
         ...(data.telefono && { telefono: data.telefono }),
         ...(data.email && { email: data.email }),
         ...(data.foto !== undefined && { foto: data.foto }),
-        ...(data.color && { color: data.color }),
         ...(data.estado && { estado: data.estado as any }),
       },
       include: {

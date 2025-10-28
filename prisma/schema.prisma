@@ -412,9 +412,9 @@ model Cita {
   id String @id @default(uuid())
 
   // Información básica
-  fecha      DateTime @db.Date
-  horaInicio DateTime @db.Time
-  horaFin    DateTime @db.Time
+  fecha      DateTime @db.Date // Solo fecha (YYYY-MM-DD) sin hora
+  horaInicio String   // Hora en formato "HH:mm" ("09:00")
+  horaFin    String   // Hora en formato "HH:mm" ("10:00")
 
   estado      EstadoCita  @default(PENDIENTE)
   notas       String?     @db.Text
@@ -437,12 +437,6 @@ model Cita {
   negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   negocioId String
 
-  // Extras seleccionados (JSON array)
-  extrasSeleccionados Json? // [{ id: "uuid", nombre: "Extra", precio: 10 }]
-
-  // Notificaciones
-  notificaciones NotificacionCita[]
-
   // Auditoría
   creadoPor     String? // ID del usuario que creó la cita
   modificadoPor String? // ID del usuario que modificó
@@ -460,31 +454,6 @@ model Cita {
   @@index([canalOrigen])
 }
 
-model NotificacionCita {
-  id     String @id @default(uuid())
-  cita   Cita   @relation(fields: [citaId], references: [id], onDelete: Cascade)
-  citaId String
-
-  tipo  TipoNotificacion
-  canal CanalNotificacion
-
-  destinatario String // Email o teléfono
-  mensaje      String @db.Text
-
-  estado   EstadoNotificacion @default(PENDIENTE)
-  intentos Int                @default(0)
-
-  fechaEnvio DateTime?
-  error      String?   @db.Text
-
-  createdAt DateTime @default(now())
-
-  @@index([citaId])
-  @@index([estado])
-  @@index([tipo])
-  @@index([fechaEnvio])
-}
-
 enum EstadoCita {
   PENDIENTE
   CONFIRMADA
@@ -497,27 +466,6 @@ enum CanalOrigen {
   MANUAL
   WEB
   WHATSAPP
-}
-
-enum TipoNotificacion {
-  CONFIRMACION
-  RECORDATORIO_24H
-  RECORDATORIO_1H
-  CANCELACION
-  REAGENDAMIENTO
-}
-
-enum CanalNotificacion {
-  WHATSAPP
-  EMAIL
-  SMS
-}
-
-enum EstadoNotificacion {
-  PENDIENTE
-  ENVIADO
-  FALLIDO
-  CANCELADO
 }
 
 // ============================================================================
@@ -568,9 +516,3 @@ model ConfiguracionGlobal {
 
   @@index([clave])
 }
-
-// Ejemplo de configuraciones:
-// - DURACION_PRUEBA_GRATIS: "7"
-// - EMAIL_NOTIFICACIONES: "admin@tusaas.com"
-// - MANTENIMIENTO_ACTIVO: "false"
-// - PLANES_DISPONIBLES: '["MENSUAL","TRIMESTRAL","ANUAL"]'

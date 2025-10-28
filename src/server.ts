@@ -11,6 +11,7 @@ import { sucursalRoutes } from './routes/sucursal.routes';
 import { clienteRoutes } from './routes/cliente.routes';
 import { empleadoRoutes } from './routes/empleado.routes';
 import { servicioRoutes } from './routes/servicio.routes';
+import { citaRoutes } from './routes/cita.routes';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -56,6 +57,9 @@ app.register(empleadoRoutes, { prefix: '/api/empleados' });
 
 // Registrar rutas de servicios
 app.register(servicioRoutes, { prefix: '/api' });
+
+// Registrar rutas de citas
+app.register(citaRoutes, { prefix: '/api/citas' });
 
 const start = async () => {
   try {
