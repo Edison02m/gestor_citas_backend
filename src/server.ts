@@ -7,11 +7,13 @@ import { codigoSuscripcionRoutes } from './routes/codigo-suscripcion.routes';
 import { usuarioRoutes } from './routes/usuario.routes';
 import { suscripcionRoutes } from './routes/suscripcion.routes';
 import { onboardingRoutes } from './routes/onboarding.routes';
+import { negocioRoutes } from './routes/negocio.routes';
 import { sucursalRoutes } from './routes/sucursal.routes';
 import { clienteRoutes } from './routes/cliente.routes';
 import { empleadoRoutes } from './routes/empleado.routes';
 import { servicioRoutes } from './routes/servicio.routes';
 import { citaRoutes } from './routes/cita.routes';
+import { publicAgendaRoutes } from './routes/public-agenda.routes';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -20,13 +22,29 @@ const app = fastify({ logger: true });
 
 // Configurar CORS
 app.register(cors, {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'http://192.168.0.108:3000',
+    process.env.FRONTEND_URL || 'http://localhost:3000'
+  ],
+  credentials: true,
 });
 
 // Ruta de prueba
 app.get('/health', async () => {
   return { status: 'OK', message: 'Server is running' };
 });
+
+// ============================================================================
+// RUTAS PÚBLICAS (sin autenticación)
+// ============================================================================
+
+// Registrar rutas de agenda pública
+app.register(publicAgendaRoutes, { prefix: '/api/public-agenda' });
+
+// ============================================================================
+// RUTAS AUTENTICADAS
+// ============================================================================
 
 // Registrar rutas de autenticación
 app.register(authRoutes, { prefix: '/api/auth' });
@@ -45,6 +63,9 @@ app.register(suscripcionRoutes, { prefix: '/api/suscripciones' });
 
 // Registrar rutas de onboarding
 app.register(onboardingRoutes, { prefix: '/api/onboarding' });
+
+// Registrar rutas de negocio
+app.register(negocioRoutes, { prefix: '/api' });
 
 // Registrar rutas de sucursales
 app.register(sucursalRoutes, { prefix: '/api' });
