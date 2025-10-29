@@ -72,6 +72,19 @@ export class PublicAgendaService {
         telefono: true,
         ciudad: true,
         estado: true,
+        horarios: {
+          select: {
+            id: true,
+            diaSemana: true,
+            abierto: true,
+            horaApertura: true,
+            horaCierre: true,
+            tieneDescanso: true,
+            descansoInicio: true,
+            descansoFin: true,
+          },
+          orderBy: { diaSemana: 'asc' },
+        },
       },
       orderBy: { nombre: 'asc' },
     });
