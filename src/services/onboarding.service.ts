@@ -164,6 +164,7 @@ export class OnboardingService {
           provincia: dto.provincia,
           telefono: dto.telefono,
           email: dto.email,
+          googleMapsUrl: dto.googleMapsUrl,
           negocioId,
         },
       });
@@ -412,6 +413,7 @@ export class OnboardingService {
               provincia: sucursalDto.provincia,
               telefono: sucursalDto.telefono,
               email: sucursalDto.email,
+              googleMapsUrl: sucursalDto.googleMapsUrl,
               negocioId,
             },
           });

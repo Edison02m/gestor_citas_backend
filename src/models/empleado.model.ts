@@ -8,6 +8,19 @@ export interface EmpleadoDto {
   foto?: string;
 }
 
+export interface EmpleadoSucursalResponse {
+  empleadoId: string;
+  sucursalId: string;
+  asignadoEn: Date;
+  sucursal?: {
+    id: string;
+    nombre: string;
+    direccion: string;
+    telefono: string;
+    estado: string;
+  };
+}
+
 export interface EmpleadoResponse {
   id: string;
   nombre: string;
@@ -17,6 +30,7 @@ export interface EmpleadoResponse {
   foto?: string | null;
   estado: string;
   negocioId: string;
+  sucursales?: EmpleadoSucursalResponse[];
   horarios?: HorarioEmpleadoResponse[];
   createdAt: Date;
   updatedAt: Date;
@@ -81,16 +95,4 @@ export interface EmpleadosListResponse {
 
 export interface SucursalAsignacionDto {
   sucursalId: string;
-}
-
-export interface EmpleadoSucursalResponse {
-  empleadoId: string;
-  sucursalId: string;
-  asignadoEn: Date;
-  sucursal?: {
-    id: string;
-    nombre: string;
-    direccion: string;
-    telefono: string;
-  };
 }

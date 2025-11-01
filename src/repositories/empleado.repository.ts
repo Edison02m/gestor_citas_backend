@@ -21,6 +21,19 @@ export class EmpleadoRepository {
       this.prisma.empleado.findMany({
         where: { negocioId },
         include: {
+          sucursales: {
+            include: {
+              sucursal: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  direccion: true,
+                  telefono: true,
+                  estado: true,
+                },
+              },
+            },
+          },
           horarios: {
             orderBy: { diaSemana: 'asc' },
           },
@@ -47,6 +60,19 @@ export class EmpleadoRepository {
     return await this.prisma.empleado.findFirst({
       where: { id, negocioId },
       include: {
+        sucursales: {
+          include: {
+            sucursal: {
+              select: {
+                id: true,
+                nombre: true,
+                direccion: true,
+                telefono: true,
+                estado: true,
+              },
+            },
+          },
+        },
         horarios: {
           orderBy: { diaSemana: 'asc' },
         },

@@ -104,6 +104,7 @@ export class SucursalService {
       provincia: dto.provincia?.trim(),
       telefono: dto.telefono.trim(),
       email: dto.email?.trim(),
+      googleMapsUrl: dto.googleMapsUrl?.trim(),
       horarios: dto.horarios,
     });
 
@@ -161,6 +162,7 @@ export class SucursalService {
     if (dto.provincia !== undefined) dataLimpia.provincia = dto.provincia?.trim() || null;
     if (dto.telefono !== undefined) dataLimpia.telefono = dto.telefono.trim();
     if (dto.email !== undefined) dataLimpia.email = dto.email?.trim() || null;
+    if (dto.googleMapsUrl !== undefined) dataLimpia.googleMapsUrl = dto.googleMapsUrl?.trim() || null;
     if (dto.estado !== undefined) dataLimpia.estado = dto.estado;
 
     const sucursal = await this.sucursalRepository.update(id, dataLimpia);
@@ -274,6 +276,7 @@ export class SucursalService {
       provincia: sucursal.provincia,
       telefono: sucursal.telefono,
       email: sucursal.email,
+      googleMapsUrl: sucursal.googleMapsUrl,
       estado: sucursal.estado,
       negocioId: sucursal.negocioId,
       createdAt: sucursal.createdAt,

@@ -49,6 +49,7 @@ export class SucursalRepository {
         provincia: data.provincia,
         telefono: data.telefono,
         email: data.email,
+        googleMapsUrl: data.googleMapsUrl,
         negocioId,
         horarios: {
           createMany: {
@@ -82,6 +83,7 @@ export class SucursalRepository {
         ...(data.provincia !== undefined && { provincia: data.provincia }),
         ...(data.telefono !== undefined && { telefono: data.telefono }),
         ...(data.email !== undefined && { email: data.email }),
+        ...(data.googleMapsUrl !== undefined && { googleMapsUrl: data.googleMapsUrl }),
         ...(data.estado !== undefined && { estado: data.estado as any }),
       },
       include: {

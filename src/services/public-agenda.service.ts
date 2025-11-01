@@ -113,6 +113,12 @@ export class PublicAgendaService {
         duracion: true,
         precio: true,
         color: true,
+        sucursales: {
+          select: {
+            sucursalId: true,
+            disponible: true,
+          },
+        },
       },
       orderBy: { nombre: 'asc' },
     });
@@ -191,6 +197,12 @@ export class PublicAgendaService {
    * Busca o crea el cliente automáticamente
    */
   async crearCitaPublica(linkPublico: string, dto: CreateCitaPublicaDto): Promise<any> {
+    // Validar formato del email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!dto.clienteEmail || !emailRegex.test(dto.clienteEmail)) {
+      throw new Error('El email es obligatorio y debe tener un formato válido');
+    }
+
     const negocio = await this.validarNegocioPublico(linkPublico);
 
     console.log('🌐 AGENDA PÚBLICA - Creando cita:', {

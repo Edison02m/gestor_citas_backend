@@ -27,6 +27,7 @@ export interface OnboardingSucursalDto {
   provincia?: string;
   telefono: string;
   email?: string;
+  googleMapsUrl?: string;
   
   // Horarios (al menos los 7 días de la semana)
   horarios: {

@@ -2,7 +2,7 @@
 
 export interface ServicioDto {
   nombre: string;
-  descripcion: string;
+  descripcion?: string; // Opcional
   duracion: number; // Duración en minutos
   precio: number;
   foto?: string;

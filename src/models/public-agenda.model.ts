@@ -14,7 +14,7 @@ export interface CreateCitaPublicaDto {
   clienteNombre: string;
   clienteCedula: string;
   clienteTelefono: string;
-  clienteEmail?: string;
+  clienteEmail: string; // Obligatorio
 
   // Datos de la cita
   fecha: string; // "2024-10-23"
@@ -67,6 +67,10 @@ export interface ServicioPublicoResponse {
   duracion: number; // minutos
   precio: number;
   color: string;
+  sucursales?: {
+    sucursalId: string;
+    disponible: boolean;
+  }[];
 }
 
 export interface EmpleadoPublicoResponse {

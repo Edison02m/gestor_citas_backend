@@ -9,6 +9,7 @@ import {
   DisponibilidadEmpleadoDto,
   HorarioDisponible,
 } from '../models/cita.model';
+import { emailService } from '../emails/EmailService';
 
 export class CitaService {
   private citaRepository: CitaRepository;
@@ -204,6 +205,14 @@ export class CitaService {
         empleado: { connect: { id: dto.empleadoId } },
       }),
     });
+
+    // 7. Enviar email de confirmación (asíncrono, no bloquea la respuesta)
+    if (cliente.email) {
+      this.enviarEmailConfirmacion(cita.id).catch((err: Error) => {
+        console.error('Error enviando email de confirmación:', err);
+        // No lanzamos el error para que no falle la creación de la cita
+      });
+    }
 
     return cita;
   }
@@ -1226,4 +1235,88 @@ export class CitaService {
       (citaInicioMin <= descansoInicioMin && citaFinMin >= descansoFinMin)
     );
   }
+
+  /**
+   * Enviar email de confirmación de cita
+   * Este método obtiene toda la información necesaria y envía el email
+   */
+  private async enviarEmailConfirmacion(citaId: string): Promise<void> {
+    try {
+      // Obtener todos los datos necesarios para el email
+      const cita = await this.prisma.cita.findUnique({
+        where: { id: citaId },
+        include: {
+          cliente: true,
+          servicio: true,
+          empleado: true,
+          sucursal: true,
+          negocio: true,
+        },
+      });
+
+      if (!cita || !cita.cliente.email) {
+        console.log('⚠️  No se puede enviar email: cita no encontrada o cliente sin email');
+        return;
+      }
+
+      // Formatear la fecha para el email (ej: "Lunes 30 de Octubre, 2025")
+      const fechaFormateada = this.formatearFechaParaEmail(cita.fecha);
+
+      // Formatear la hora (ej: "09:00 AM - 10:00 AM")
+      const horaFormateada = `${cita.horaInicio} - ${cita.horaFin}`;
+
+      // Log de datos que se enviarán
+      console.log('📧 Preparando email con los siguientes datos:');
+      console.log(`   Cliente: ${cita.cliente.nombre} (${cita.cliente.email})`);
+      console.log(`   Negocio: ${cita.negocio.nombre || 'SIN NOMBRE'}`);
+      console.log(`   Servicio: ${cita.servicio.nombre}`);
+      console.log(`   Empleado: ${cita.empleado?.nombre || 'Sin asignar'}`);
+      console.log(`   Fecha: ${fechaFormateada}`);
+      console.log(`   Hora: ${horaFormateada}`);
+      console.log(`   Sucursal: ${cita.sucursal.nombre}`);
+
+      // Enviar el email
+      const resultado = await emailService.enviarConfirmacionCita({
+        emailDestinatario: cita.cliente.email,
+        nombreCliente: cita.cliente.nombre,
+        nombreNegocio: cita.negocio.nombre || 'Nuestro Negocio',
+        nombreServicio: cita.servicio.nombre,
+        nombreEmpleado: cita.empleado?.nombre || 'Nuestro equipo',
+        fecha: fechaFormateada,
+        hora: horaFormateada,
+        nombreSucursal: cita.sucursal.nombre,
+        direccionSucursal: cita.sucursal.direccion || undefined,
+        telefonoSucursal: cita.sucursal.telefono || undefined,
+        googleMapsUrl: cita.sucursal.googleMapsUrl || undefined,
+      });
+
+      if (resultado.success) {
+        console.log(`✅ Email de confirmación enviado a ${cita.cliente.email}`);
+      } else {
+        console.warn(`⚠️  No se pudo enviar email: ${resultado.error}`);
+      }
+    } catch (error) {
+      console.error('❌ Error en enviarEmailConfirmacion:', error);
+      // No lanzamos el error para que no afecte la creación de la cita
+    }
+  }
+
+  /**
+   * Formatear fecha para mostrar en email
+   */
+  private formatearFechaParaEmail(fecha: Date): string {
+    const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    const dia = fecha.getDate();
+    const mes = meses[fecha.getMonth()];
+    const año = fecha.getFullYear();
+    const diaSemana = dias[fecha.getDay()];
+
+    return `${diaSemana} ${dia} de ${mes}, ${año}`;
+  }
 }
+

@@ -60,6 +60,8 @@ model Negocio {
   telefono    String
   logo        String?
   descripcion String?
+  direccion   String? // Dirección del negocio
+  googleMapsUrl String? // URL de Google Maps para ubicación
   usuario     Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   usuarioId   String  @unique
 
@@ -320,13 +322,14 @@ enum EstadoEmpleado {
 // ============================================================================
 
 model Sucursal {
-  id        String @id @default(uuid())
-  nombre    String
-  direccion String
-  ciudad    String?
-  provincia String?
-  telefono  String
-  email     String?
+  id            String  @id @default(uuid())
+  nombre        String
+  direccion     String
+  ciudad        String?
+  provincia     String?
+  telefono      String
+  email         String?
+  googleMapsUrl String? // URL de Google Maps para ubicación
 
   estado EstadoSucursal @default(ACTIVA)
 

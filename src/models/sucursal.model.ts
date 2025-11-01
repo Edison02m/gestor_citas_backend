@@ -7,6 +7,7 @@ export interface SucursalDto {
   provincia?: string;
   telefono: string;
   email?: string;
+  googleMapsUrl?: string;
   horarios: HorarioSucursalDto[];
 }
 
@@ -17,6 +18,7 @@ export interface SucursalUpdateDto {
   provincia?: string | null;
   telefono?: string;
   email?: string | null;
+  googleMapsUrl?: string | null;
   estado?: string; // "ACTIVA" | "INACTIVA"
 }
 
@@ -38,6 +40,7 @@ export interface SucursalResponse {
   provincia: string | null;
   telefono: string;
   email: string | null;
+  googleMapsUrl: string | null;
   estado: string;
   negocioId: string;
   createdAt: Date;

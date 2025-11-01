@@ -51,10 +51,6 @@ export class ServicioService {
       throw new Error('El nombre del servicio es requerido');
     }
 
-    if (!dto.descripcion || dto.descripcion.trim() === '') {
-      throw new Error('La descripción es requerida');
-    }
-
     if (!dto.duracion || dto.duracion <= 0) {
       throw new Error('La duración debe ser mayor a 0 minutos');
     }
@@ -83,7 +79,7 @@ export class ServicioService {
     // Crear servicio
     const servicio = await this.servicioRepository.create(negocioId, {
       nombre: dto.nombre.trim(),
-      descripcion: dto.descripcion.trim(),
+      descripcion: dto.descripcion?.trim() || '',
       duracion: dto.duracion,
       precio: dto.precio,
       foto: dto.foto?.trim(),
@@ -122,10 +118,6 @@ export class ServicioService {
     }
 
     // Validar otros campos
-    if (dto.descripcion !== undefined && (!dto.descripcion || dto.descripcion.trim() === '')) {
-      throw new Error('La descripción no puede estar vacía');
-    }
-
     if (dto.duracion !== undefined && dto.duracion <= 0) {
       throw new Error('La duración debe ser mayor a 0 minutos');
     }
@@ -144,7 +136,7 @@ export class ServicioService {
     // Limpiar datos
     const dataLimpia: ServicioUpdateDto = {};
     if (dto.nombre !== undefined) dataLimpia.nombre = dto.nombre.trim();
-    if (dto.descripcion !== undefined) dataLimpia.descripcion = dto.descripcion.trim();
+    if (dto.descripcion !== undefined) dataLimpia.descripcion = dto.descripcion?.trim() || '';
     if (dto.duracion !== undefined) dataLimpia.duracion = dto.duracion;
     if (dto.precio !== undefined) dataLimpia.precio = dto.precio;
     if (dto.foto !== undefined) dataLimpia.foto = dto.foto?.trim() || null;
