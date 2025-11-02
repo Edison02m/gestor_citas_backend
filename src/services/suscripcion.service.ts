@@ -15,9 +15,9 @@ import {
 const JERARQUIA_PLANES: Record<string, number> = {
   'GRATIS': 0,
   'PRO_MENSUAL': 1,
-  'PRO_ANUAL': 1, // Mismo nivel que mensual, pero anual
+  'PRO_ANUAL': 1, 
   'PRO_PLUS_MENSUAL': 2,
-  'PRO_PLUS_ANUAL': 2, // Mismo nivel que mensual, pero anual
+  'PRO_PLUS_ANUAL': 2,
   'PERSONALIZADO': 3,
 };
 
