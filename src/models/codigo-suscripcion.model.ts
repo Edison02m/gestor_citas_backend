@@ -4,7 +4,7 @@ import { PlanSuscripcion } from '@prisma/client';
 
 export interface CreateCodigoSuscripcionDto {
   plan: PlanSuscripcion;
-  duracionMeses: number;
+  duracionDias: number;
   descripcion?: string;
   precio?: number;
   fechaExpiracion?: Date;
@@ -17,7 +17,7 @@ export interface CodigoSuscripcionResponse {
   id: string;
   codigo: string;
   plan: PlanSuscripcion;
-  duracionMeses: number;
+  duracionDias: number;
   descripcion?: string;
   precio?: number;
   usado: boolean;
@@ -49,7 +49,7 @@ export interface CodigoSuscripcionFilters {
 
 export interface GenerarCodigosDto {
   plan: PlanSuscripcion;
-  duracionMeses: number;
+  duracionDias: number;
   cantidad: number;
   descripcion?: string;
   precio?: number;

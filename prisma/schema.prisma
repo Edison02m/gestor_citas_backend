@@ -77,24 +77,41 @@ model Negocio {
   linkPublico   String?  @unique // Link único para agenda pública (ej: "salon-maria-abc123")
   agendaPublica Boolean  @default(true) // Habilitar/deshabilitar agenda pública
 
+  // LÍMITES DEL PLAN (null = ilimitado)
+  limiteSucursales  Int? // 1 (GRATIS), 5 (PRO), null (PRO PLUS = ilimitado)
+  limiteEmpleados   Int? // 3 (GRATIS), 10 (PRO), null (PRO PLUS = ilimitado)
+  limiteServicios   Int? // 5 (GRATIS), 25 (PRO), null (PRO PLUS = ilimitado)
+  limiteClientes    Int? // 50 (GRATIS), 500 (PRO), null (PRO PLUS = ilimitado)
+  limiteCitasMes    Int? // 50 (GRATIS), null (PRO y PRO PLUS = ilimitado)
+  limiteWhatsAppMes Int? // null (GRATIS = sin WhatsApp), 300 (PRO), null (PRO PLUS = ilimitado)
+  limiteEmailMes    Int? // 50 (GRATIS), 300 (PRO), null (PRO PLUS = ilimitado)
+
+  // CARACTERÍSTICAS HABILITADAS POR PLAN
+  reportesAvanzados Boolean @default(false) // Solo PRO PLUS
+
   // NOTIFICACIONES Y RECORDATORIOS
   notificacionesWhatsApp Boolean @default(true)
   notificacionesEmail    Boolean @default(true)
   
   // Recordatorios configurables (en minutos antes de la cita, null = deshabilitado)
-  recordatorio1         Int?    @default(1440) // Por defecto 24 horas (1440 minutos)
-  recordatorio2         Int?    // Recordatorio adicional opcional
+  recordatorio1 Int? @default(1440) // Por defecto 24 horas (1440 minutos) - Todos los planes
+  recordatorio2 Int? // Recordatorio adicional - Todos los planes
+  recordatorio3 Int? // Recordatorio adicional - Solo PRO PLUS
+  recordatorio4 Int? // Recordatorio adicional - Solo PRO PLUS
+  recordatorio5 Int? // Recordatorio adicional - Solo PRO PLUS
   
   // Mensajes personalizables para WhatsApp
   mensajeRecordatorio   String? @default("Hola {cliente}, te recordamos tu cita el {fecha} a las {hora} en {negocio}. ¡Te esperamos!")
   mensajeReagendamiento String? @default("Hola {cliente}, tu cita ha sido reagendada para el {fecha} a las {hora}. Gracias por tu comprensión.")
 
   // RELACIONES
-  sucursales Sucursal[]
-  servicios  Servicio[]
-  empleados  Empleado[]
-  clientes   Cliente[]
-  citas      Cita[]
+  sucursales      Sucursal[]
+  servicios       Servicio[]
+  empleados       Empleado[]
+  clientes        Cliente[]
+  citas           Cita[]
+  usoRecursos     UsoRecursos[]
+  registrosEnvios RegistroEnvio[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -120,6 +137,12 @@ model Suscripcion {
   activa         Boolean @default(true)
   renovacionAuto Boolean @default(false)
 
+  // Plan pendiente (sistema de cola)
+  planPendiente         String?   // Plan que se activará cuando venza el actual
+  codigoPendienteId     String?   // Código del plan pendiente
+  codigoPendiente       CodigoSuscripcion? @relation("CodigoPendiente", fields: [codigoPendienteId], references: [id])
+  fechaInicioPendiente  DateTime? // Fecha en que se activará el plan pendiente
+
   // Historial
   historial HistorialSuscripcion[]
 
@@ -130,6 +153,8 @@ model Suscripcion {
   @@index([codigoId])
   @@index([fechaVencimiento])
   @@index([activa])
+  @@index([planPendiente])
+  @@index([fechaInicioPendiente])
 }
 
 model CodigoSuscripcion {
@@ -137,10 +162,10 @@ model CodigoSuscripcion {
   codigo String @unique // "MEN-2024-ABC123"
 
   // Configuración del plan
-  plan          PlanSuscripcion @default(MENSUAL)
-  duracionMeses Int // 1, 3, 6, 12, etc.
+  plan          PlanSuscripcion @default(GRATIS)
+  duracionDias  Int // 14 (GRATIS), 30 (MENSUAL), 365 (ANUAL)
   descripcion   String?
-  precio        Decimal?        @db.Decimal(10, 2) // Para referencia
+  precio        Decimal?        @db.Decimal(10, 2) // 0 (GRATIS), 10 (PRO_MENSUAL), 9 (PRO_ANUAL), 20 (PRO_PLUS_MENSUAL), 17 (PRO_PLUS_ANUAL)
 
   // Control de uso
   usado           Boolean   @default(false)
@@ -154,7 +179,8 @@ model CodigoSuscripcion {
   notas          String?
 
   // Relaciones
-  suscripciones Suscripcion[]
+  suscripciones           Suscripcion[]
+  suscripcionesPendientes Suscripcion[] @relation("CodigoPendiente")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -192,12 +218,12 @@ enum EstadoSuscripcion {
 }
 
 enum PlanSuscripcion {
-  PRUEBA // 7 días de prueba
-  MENSUAL // 1 mes
-  TRIMESTRAL // 3 meses
-  SEMESTRAL // 6 meses
-  ANUAL // 12 meses
-  PERSONALIZADO // X meses custom
+  GRATIS          // 14 días de prueba - $0
+  PRO_MENSUAL     // Plan PRO facturado mensualmente - $10/mes
+  PRO_ANUAL       // Plan PRO facturado anualmente - $9/mes ($108/año)
+  PRO_PLUS_MENSUAL // Plan PRO PLUS facturado mensualmente - $20/mes
+  PRO_PLUS_ANUAL   // Plan PRO PLUS facturado anualmente - $17/mes ($204/año)
+  PERSONALIZADO    // Para casos especiales
 }
 
 enum AccionSuscripcion {
@@ -209,6 +235,8 @@ enum AccionSuscripcion {
   DESBLOQUEO
   CANCELACION
   CAMBIO_PLAN
+  PLAN_EN_COLA                    // Plan guardado para activación futura
+  PLAN_ACTIVADO_AUTOMATICAMENTE   // Plan pendiente activado al vencer el anterior
 }
 
 // ============================================================================
@@ -445,6 +473,9 @@ model Cita {
   negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   negocioId String
 
+  // Relación con envíos
+  registrosEnvios RegistroEnvio[]
+
   // Auditoría
   creadoPor     String? // ID del usuario que creó la cita
   modificadoPor String? // ID del usuario que modificó
@@ -507,6 +538,93 @@ model ServicioSucursal {
   @@index([servicioId])
   @@index([sucursalId])
   @@index([disponible])
+}
+
+// ============================================================================
+// SEGUIMIENTO DE USO DE RECURSOS (Control de Límites)
+// ============================================================================
+
+model UsoRecursos {
+  id        String   @id @default(uuid())
+  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
+  mes  Int // 1-12
+  anio Int // 2025, 2026...
+
+  // Contadores del mes actual
+  citasCreadas     Int @default(0)
+  whatsappEnviados Int @default(0)
+  emailsEnviados   Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([negocioId, mes, anio])
+  @@index([negocioId, anio, mes])
+}
+
+// ============================================================================
+// CONFIGURACIÓN DE PLANES (Configurable por Super Admin)
+// ============================================================================
+
+model ConfiguracionPlanes {
+  id   String          @id @default(uuid())
+  plan PlanSuscripcion @unique
+
+  // Límites del plan (null = ilimitado)
+  limiteSucursales  Int?
+  limiteEmpleados   Int?
+  limiteServicios   Int?
+  limiteClientes    Int?
+  limiteCitasMes    Int?
+  limiteWhatsAppMes Int?
+  limiteEmailMes    Int?
+
+  // Características
+  reportesAvanzados Boolean @default(false)
+
+  // Duración y precio
+  duracionDias Int // 14, 30, 365
+  precio       Decimal @db.Decimal(10, 2)
+
+  // Información adicional
+  nombre      String
+  descripcion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([plan])
+}
+
+// ============================================================================
+// REGISTRO DE ENVÍOS (Email y WhatsApp)
+// ============================================================================
+
+model RegistroEnvio {
+  id         String      @id @default(uuid())
+  negocioId  String
+  tipo       TipoEnvio   // EMAIL o WHATSAPP
+  destinatario String    // Email o teléfono
+  asunto     String?     // Para emails
+  exitoso    Boolean     @default(true)
+  error      String?     // Si hubo error
+  citaId     String?     // Opcional: si está relacionado con una cita
+  createdAt  DateTime    @default(now())
+
+  negocio Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  cita    Cita?   @relation(fields: [citaId], references: [id], onDelete: SetNull)
+
+  @@index([negocioId])
+  @@index([tipo])
+  @@index([createdAt])
+  @@index([citaId])
+}
+
+enum TipoEnvio {
+  EMAIL
+  WHATSAPP
 }
 
 // ============================================================================

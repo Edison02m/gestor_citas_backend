@@ -41,6 +41,10 @@ export class SuscripcionRepository {
       fechaActivacion: Date;
       fechaVencimiento: Date;
       activa: boolean;
+      // 🧹 Campos opcionales para limpiar cola
+      planPendiente?: string | null;
+      codigoPendienteId?: string | null;
+      fechaInicioPendiente?: Date | null;
     },
     tx?: TransactionClient
   ) {

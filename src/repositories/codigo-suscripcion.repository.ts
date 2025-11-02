@@ -12,7 +12,7 @@ export class CodigoSuscripcionRepository {
   async create(data: {
     codigo: string;
     plan: PlanSuscripcion;
-    duracionMeses: number;
+    duracionDias: number;
     descripcion?: string;
     precio?: number;
     fechaExpiracion?: Date;
@@ -24,7 +24,7 @@ export class CodigoSuscripcionRepository {
       data: {
         codigo: data.codigo,
         plan: data.plan,
-        duracionMeses: data.duracionMeses,
+        duracionDias: data.duracionDias,
         descripcion: data.descripcion,
         precio: data.precio,
         fechaExpiracion: data.fechaExpiracion,

@@ -8,6 +8,7 @@ import {
   HorarioEmpleadoDto,
   BloqueoEmpleadoDto,
 } from '../models/empleado.model';
+import limitesService from '../services/limites.service';
 
 interface QueryParams {
   pagina?: string;
@@ -88,6 +89,9 @@ export class EmpleadoController {
       const negocioId = user.negocioId;
       const dto = request.body as EmpleadoDto;
 
+      // ✅ VALIDAR LÍMITE DE EMPLEADOS ANTES DE CREAR
+      await limitesService.validarLimiteEmpleados(negocioId);
+
       const empleado = await this.service.crearEmpleado(negocioId, dto);
 
       return reply.status(201).send({
@@ -96,6 +100,15 @@ export class EmpleadoController {
         message: 'Empleado creado exitosamente',
       });
     } catch (error: any) {
+      // Si es error de límite alcanzado, retornar 402 (Payment Required)
+      if (error.message.includes('límite')) {
+        return reply.status(402).send({
+          success: false,
+          message: error.message,
+          code: 'LIMIT_REACHED'
+        });
+      }
+
       return reply.status(400).send({
         success: false,
         message: error.message || 'Error al crear empleado',

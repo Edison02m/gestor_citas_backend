@@ -35,14 +35,13 @@ export class UsuarioRepository {
       where: { id },
       include: {
         negocio: {
-          select: {
-            id: true,
-            nombre: true,
-            telefono: true,
-            logo: true,
-            descripcion: true,
-            estadoSuscripcion: true,
-            codigoAplicado: true,
+          include: {
+            suscripcion: {
+              select: {
+                planPendiente: true,
+                fechaInicioPendiente: true,
+              },
+            },
           },
         },
       },

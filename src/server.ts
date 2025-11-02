@@ -14,6 +14,10 @@ import { empleadoRoutes } from './routes/empleado.routes';
 import { servicioRoutes } from './routes/servicio.routes';
 import { citaRoutes } from './routes/cita.routes';
 import { publicAgendaRoutes } from './routes/public-agenda.routes';
+import { planesRoutes } from './routes/planes.routes';
+import { configuracionPlanesRoutes } from './routes/configuracion-planes.routes';
+import { enviosRoutes } from './routes/envios.routes';
+import planesScheduler from './services/planes-scheduler.service';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -24,7 +28,6 @@ const app = fastify({ logger: true });
 app.register(cors, {
   origin: [
     'http://localhost:3000',
-    'http://192.168.0.108:3000',
     process.env.FRONTEND_URL || 'http://localhost:3000'
   ],
   credentials: true,
@@ -82,11 +85,23 @@ app.register(servicioRoutes, { prefix: '/api' });
 // Registrar rutas de citas
 app.register(citaRoutes, { prefix: '/api/citas' });
 
+// Registrar rutas de envíos (emails y WhatsApp)
+app.register(enviosRoutes, { prefix: '/api/envios' });
+
+// Registrar rutas de planes
+app.register(planesRoutes, { prefix: '/api' });
+
+// Registrar rutas de configuración de planes (Super Admin)
+app.register(configuracionPlanesRoutes, { prefix: '/api/super-admin/planes' });
+
 const start = async () => {
   try {
     const port = Number(process.env.PORT) || 3001;
     await app.listen({ port, host: '0.0.0.0' });
     console.log(`🚀 Server running on http://localhost:${port}`);
+    
+    // 🎯 Iniciar scheduler de planes pendientes
+    planesScheduler.iniciar();
   } catch (err) {
     app.log.error(err);
     process.exit(1);

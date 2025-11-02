@@ -56,7 +56,16 @@ export class UsuarioService {
           },
         });
 
-        // 2. Crear el negocio
+        // 2. Obtener configuración del plan GRATIS desde la base de datos
+        const configPlanGratis = await tx.configuracionPlanes.findUnique({
+          where: { plan: PlanSuscripcion.GRATIS },
+        });
+
+        if (!configPlanGratis) {
+          throw new Error('Configuración del plan GRATIS no encontrada');
+        }
+
+        // 2.1 Crear el negocio con límites del plan GRATIS
         const negocio = await tx.negocio.create({
           data: {
             nombre: dto.nombreNegocio.trim(),
@@ -64,8 +73,16 @@ export class UsuarioService {
             logo: dto.logo,
             descripcion: dto.descripcion?.trim(),
             usuarioId: usuario.id,
-            estadoSuscripcion: 'ACTIVA', // Inicia con suscripción activa
-            codigoAplicado: true, // Ya tiene código aplicado (prueba automática)
+            estadoSuscripcion: 'ACTIVA',
+            codigoAplicado: true,
+            // Asignar límites del plan GRATIS directamente
+            limiteSucursales: configPlanGratis.limiteSucursales,
+            limiteEmpleados: configPlanGratis.limiteEmpleados,
+            limiteServicios: configPlanGratis.limiteServicios,
+            limiteClientes: configPlanGratis.limiteClientes,
+            limiteCitasMes: configPlanGratis.limiteCitasMes,
+            limiteWhatsAppMes: configPlanGratis.limiteWhatsAppMes,
+            reportesAvanzados: configPlanGratis.reportesAvanzados,
           },
         });
 
@@ -73,9 +90,9 @@ export class UsuarioService {
         const codigoPrueba = await tx.codigoSuscripcion.create({
           data: {
             codigo: `PRUEBA-${Date.now()}-${usuario.id.substring(0, 8)}`,
-            plan: PlanSuscripcion.PRUEBA,
-            duracionMeses: 1, // 30 días = 1 mes
-            descripcion: 'Período de prueba gratuito de 30 días',
+            plan: PlanSuscripcion.GRATIS, // Cambiar de PRUEBA a GRATIS
+            duracionDias: 14, // 14 días de prueba gratuita
+            descripcion: 'Período de prueba gratuito de 14 días',
             precio: 0,
             usado: true,
             fechaUso: new Date(),
@@ -88,7 +105,7 @@ export class UsuarioService {
         // 4. Crear la suscripción activa
         const fechaActivacion = new Date();
         const fechaVencimiento = new Date();
-        fechaVencimiento.setDate(fechaVencimiento.getDate() + 30); // 30 días desde hoy
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 14); // 14 días desde hoy
 
         const suscripcion = await tx.suscripcion.create({
           data: {
@@ -122,7 +139,7 @@ export class UsuarioService {
           data: {
             suscripcionId: suscripcion.id,
             accion: 'ACTIVACION_CODIGO',
-            descripcion: `Período de prueba de 30 días activado automáticamente. Vence el ${fechaVencimiento.toLocaleDateString('es-ES', { 
+            descripcion: `Período de prueba de 14 días activado automáticamente. Vence el ${fechaVencimiento.toLocaleDateString('es-ES', { 
               year: 'numeric', 
               month: 'long', 
               day: 'numeric' 
@@ -241,6 +258,9 @@ export class UsuarioService {
             logo: usuario.negocio.logo,
             descripcion: usuario.negocio.descripcion,
             estadoSuscripcion: usuario.negocio.estadoSuscripcion,
+            // 🎯 Plan pendiente (sistema de cola)
+            planPendiente: usuario.negocio.suscripcion?.planPendiente || null,
+            fechaInicioPendiente: usuario.negocio.suscripcion?.fechaInicioPendiente || null,
           }
         : undefined,
       createdAt: usuario.createdAt,

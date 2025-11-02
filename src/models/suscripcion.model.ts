@@ -16,6 +16,11 @@ export interface ActivarCodigoResponse {
     negocio: {
       estadoSuscripcion: string;
     };
+    // 🎯 Sistema de cola de planes
+    enCola?: boolean;
+    planActual?: string | null;
+    planPendiente?: string;
+    fechaActivacionPendiente?: Date;
   };
   message: string;
 }

@@ -9,6 +9,8 @@ import {
   DisponibilidadEmpleadoDto,
 } from '../models/cita.model';
 import { EstadoCita } from '@prisma/client';
+import limitesService from '../services/limites.service';
+import usoRecursosService from '../services/uso-recursos.service';
 
 export class CitaController {
   constructor(private service: CitaService) {}
@@ -23,7 +25,13 @@ export class CitaController {
       const negocioId = user.negocioId;
       const dto = request.body as CreateCitaDto;
 
+      // ✅ VALIDAR LÍMITE DE CITAS MENSUALES ANTES DE CREAR
+      await limitesService.validarLimiteCitasMes(negocioId);
+
       const cita = await this.service.crearCita(negocioId, dto, user.userId);
+
+      // ✅ INCREMENTAR CONTADOR DE CITAS DEL MES
+      await usoRecursosService.incrementarCitas(negocioId);
 
       return reply.status(201).send({
         success: true,
@@ -31,6 +39,15 @@ export class CitaController {
         message: 'Cita creada exitosamente',
       });
     } catch (error: any) {
+      // Si es error de límite alcanzado, retornar 402 (Payment Required)
+      if (error.message.includes('límite')) {
+        return reply.status(402).send({
+          success: false,
+          message: error.message,
+          code: 'LIMIT_REACHED'
+        });
+      }
+
       return reply.status(400).send({
         success: false,
         message: error.message || 'Error al crear cita',

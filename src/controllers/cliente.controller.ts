@@ -3,6 +3,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { ClienteService } from '../services/cliente.service';
 import { ClienteDto, ClienteUpdateDto } from '../models/cliente.model';
+import limitesService from '../services/limites.service';
 
 interface QueryParams {
   pagina?: string;
@@ -48,6 +49,9 @@ export class ClienteController {
       const negocioId = user.negocioId;
       const dto = request.body as ClienteDto;
 
+      // ✅ VALIDAR LÍMITE DE CLIENTES ANTES DE CREAR
+      await limitesService.validarLimiteClientes(negocioId);
+
       const cliente = await this.service.crearCliente(negocioId, dto);
 
       return reply.status(201).send({
@@ -56,6 +60,15 @@ export class ClienteController {
         message: 'Cliente creado exitosamente',
       });
     } catch (error: any) {
+      // Si es error de límite alcanzado, retornar 402 (Payment Required)
+      if (error.message.includes('límite')) {
+        return reply.status(402).send({
+          success: false,
+          message: error.message,
+          code: 'LIMIT_REACHED'
+        });
+      }
+
       return reply.status(400).send({
         success: false,
         message: error.message || 'Error al crear cliente',

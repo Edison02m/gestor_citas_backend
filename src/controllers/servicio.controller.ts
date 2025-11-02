@@ -8,6 +8,7 @@ import {
   ServicioUpdateDto,
   AsignarSucursalesDto
 } from '../models/servicio.model';
+import limitesService from '../services/limites.service';
 
 const prisma = new PrismaClient();
 
@@ -113,6 +114,9 @@ export class ServicioController {
         });
       }
 
+      // ✅ VALIDAR LÍMITE DE SERVICIOS ANTES DE CREAR
+      await limitesService.validarLimiteServicios(negocioId);
+
       const servicio = await this.servicioService.crearServicio(negocioId, dto);
 
       return reply.status(201).send({
@@ -122,6 +126,16 @@ export class ServicioController {
       });
     } catch (error: any) {
       console.error('Error al crear servicio:', error);
+
+      // Si es error de límite alcanzado, retornar 402 (Payment Required)
+      if (error.message.includes('límite')) {
+        return reply.status(402).send({
+          success: false,
+          message: error.message,
+          code: 'LIMIT_REACHED'
+        });
+      }
+
       return reply.status(400).send({
         success: false,
         message: error.message || 'Error al crear servicio'

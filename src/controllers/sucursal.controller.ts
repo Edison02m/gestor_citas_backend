@@ -4,6 +4,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { SucursalService } from '../services/sucursal.service';
 import { PrismaClient } from '@prisma/client';
 import { SucursalDto, SucursalUpdateDto, HorarioSucursalDto } from '../models/sucursal.model';
+import limitesService from '../services/limites.service';
 
 const prisma = new PrismaClient();
 
@@ -102,6 +103,9 @@ export class SucursalController {
       const negocioId = user.negocioId;
       const dto = request.body as SucursalDto;
 
+      // ✅ VALIDAR LÍMITE DE SUCURSALES ANTES DE CREAR
+      await limitesService.validarLimiteSucursales(negocioId);
+
       const sucursal = await this.sucursalService.crearSucursal(negocioId, dto);
 
       return reply.status(201).send({
@@ -110,6 +114,15 @@ export class SucursalController {
         message: 'Sucursal creada exitosamente'
       });
     } catch (error: any) {
+      // Si es error de límite alcanzado, retornar 402 (Payment Required)
+      if (error.message.includes('límite')) {
+        return reply.status(402).send({
+          success: false,
+          message: error.message,
+          code: 'LIMIT_REACHED'
+        });
+      }
+
       return reply.status(400).send({
         success: false,
         message: error.message || 'Error al crear sucursal'

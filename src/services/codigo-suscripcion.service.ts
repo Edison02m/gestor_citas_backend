@@ -14,11 +14,11 @@ export class CodigoSuscripcionService {
 
   private generarCodigoUnico(plan: PlanSuscripcion): string {
     const prefijos: Record<PlanSuscripcion, string> = {
-      PRUEBA: 'PRU',
-      MENSUAL: 'MEN',
-      TRIMESTRAL: 'TRI',
-      SEMESTRAL: 'SEM',
-      ANUAL: 'ANU',
+      GRATIS: 'GRA',
+      PRO_MENSUAL: 'PRM',
+      PRO_ANUAL: 'PRA',
+      PRO_PLUS_MENSUAL: 'PPM',
+      PRO_PLUS_ANUAL: 'PPA',
       PERSONALIZADO: 'PER',
     };
 
@@ -30,14 +30,8 @@ export class CodigoSuscripcionService {
   }
 
   async create(dto: CreateCodigoSuscripcionDto): Promise<CodigoSuscripcionResponse> {
-    if (dto.plan === ('PRUEBA' as PlanSuscripcion)) {
-      if (dto.duracionMeses !== 0) {
-        throw new Error('Para plan PRUEBA, la duración debe ser 0 (se usan 7 días fijos)');
-      }
-    } else {
-      if (dto.duracionMeses <= 0) {
-        throw new Error('La duración debe ser mayor a 0 meses');
-      }
+    if (dto.duracionDias <= 0) {
+      throw new Error('La duración debe ser mayor a 0 días');
     }
 
     if (dto.usoMaximo && dto.usoMaximo < 1) {
@@ -62,7 +56,7 @@ export class CodigoSuscripcionService {
     const codigoCreado = await this.repository.create({
       codigo,
       plan: dto.plan,
-      duracionMeses: dto.duracionMeses,
+      duracionDias: dto.duracionDias,
       descripcion: dto.descripcion,
       precio: dto.precio,
       fechaExpiracion: dto.fechaExpiracion,
@@ -79,8 +73,8 @@ export class CodigoSuscripcionService {
       throw new Error('La cantidad debe estar entre 1 y 100');
     }
 
-    if (dto.duracionMeses <= 0) {
-      throw new Error('La duración debe ser mayor a 0 meses');
+    if (dto.duracionDias <= 0) {
+      throw new Error('La duración debe ser mayor a 0 días');
     }
 
     const codigos: CodigoSuscripcionResponse[] = [];
@@ -88,7 +82,7 @@ export class CodigoSuscripcionService {
     for (let i = 0; i < dto.cantidad; i++) {
       const codigo = await this.create({
         plan: dto.plan,
-        duracionMeses: dto.duracionMeses,
+        duracionDias: dto.duracionDias,
         descripcion: dto.descripcion
           ? `${dto.descripcion} (${i + 1}/${dto.cantidad})`
           : undefined,
@@ -169,7 +163,7 @@ export class CodigoSuscripcionService {
       id: codigo.id,
       codigo: codigo.codigo,
       plan: codigo.plan,
-      duracionMeses: codigo.duracionMeses,
+      duracionDias: codigo.duracionDias,
       descripcion: codigo.descripcion || undefined,
       precio: codigo.precio ? parseFloat(codigo.precio.toString()) : undefined,
       usado: codigo.usado,

@@ -39,6 +39,9 @@ export interface UsuarioResponse {
     logo?: string;
     descripcion?: string;
     estadoSuscripcion: string;
+    // 🎯 Plan pendiente (sistema de cola)
+    planPendiente?: string | null;
+    fechaInicioPendiente?: Date | null;
   };
   createdAt: Date;
   updatedAt: Date;

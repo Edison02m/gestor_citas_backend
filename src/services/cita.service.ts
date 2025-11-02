@@ -1,6 +1,6 @@
 // src/services/cita.service.ts
 
-import { PrismaClient, EstadoCita } from '@prisma/client';
+import { PrismaClient, EstadoCita, TipoEnvio } from '@prisma/client';
 import { CitaRepository } from '../repositories/cita.repository';
 import {
   CreateCitaDto,
@@ -10,6 +10,7 @@ import {
   HorarioDisponible,
 } from '../models/cita.model';
 import { emailService } from '../emails/EmailService';
+import enviosService from './envios.service';
 
 export class CitaService {
   private citaRepository: CitaRepository;
@@ -208,10 +209,18 @@ export class CitaService {
 
     // 7. Enviar email de confirmación (asíncrono, no bloquea la respuesta)
     if (cliente.email) {
-      this.enviarEmailConfirmacion(cita.id).catch((err: Error) => {
-        console.error('Error enviando email de confirmación:', err);
-        // No lanzamos el error para que no falle la creación de la cita
-      });
+      // Validar límite de emails antes de enviar
+      const puedeEnviar = await enviosService.puedeEnviarEmail(negocioId);
+      
+      if (puedeEnviar.permitido) {
+        this.enviarEmailConfirmacion(cita.id, negocioId).catch((err: Error) => {
+          console.error('Error enviando email de confirmación:', err);
+          // No lanzamos el error para que no falle la creación de la cita
+        });
+      } else {
+        console.warn(`⚠️ No se envió email: ${puedeEnviar.mensaje}`);
+        console.warn(`   Emails usados: ${puedeEnviar.usado}/${puedeEnviar.limite}`);
+      }
     }
 
     return cita;
@@ -1239,8 +1248,9 @@ export class CitaService {
   /**
    * Enviar email de confirmación de cita
    * Este método obtiene toda la información necesaria y envía el email
+   * También registra el envío en la base de datos
    */
-  private async enviarEmailConfirmacion(citaId: string): Promise<void> {
+  private async enviarEmailConfirmacion(citaId: string, negocioId: string): Promise<void> {
     try {
       // Obtener todos los datos necesarios para el email
       const cita = await this.prisma.cita.findUnique({
@@ -1292,11 +1302,61 @@ export class CitaService {
 
       if (resultado.success) {
         console.log(`✅ Email de confirmación enviado a ${cita.cliente.email}`);
+        
+        // ✅ REGISTRAR EL ENVÍO EXITOSO
+        await enviosService.registrarEnvio(
+          negocioId,
+          TipoEnvio.EMAIL,
+          cita.cliente.email,
+          {
+            asunto: 'Confirmación de cita',
+            exitoso: true,
+            citaId: cita.id,
+          }
+        );
       } else {
         console.warn(`⚠️  No se pudo enviar email: ${resultado.error}`);
+        
+        // ❌ REGISTRAR EL ENVÍO FALLIDO
+        await enviosService.registrarEnvio(
+          negocioId,
+          TipoEnvio.EMAIL,
+          cita.cliente.email,
+          {
+            asunto: 'Confirmación de cita',
+            exitoso: false,
+            error: resultado.error,
+            citaId: cita.id,
+          }
+        );
       }
     } catch (error) {
       console.error('❌ Error en enviarEmailConfirmacion:', error);
+      
+      // ❌ REGISTRAR EL ERROR
+      try {
+        const cita = await this.prisma.cita.findUnique({
+          where: { id: citaId },
+          include: { cliente: true },
+        });
+        
+        if (cita && cita.cliente.email) {
+          await enviosService.registrarEnvio(
+            negocioId,
+            TipoEnvio.EMAIL,
+            cita.cliente.email,
+            {
+              asunto: 'Confirmación de cita',
+              exitoso: false,
+              error: error instanceof Error ? error.message : 'Error desconocido',
+              citaId: cita.id,
+            }
+          );
+        }
+      } catch (registroError) {
+        console.error('Error registrando envío fallido:', registroError);
+      }
+      
       // No lanzamos el error para que no afecte la creación de la cita
     }
   }
