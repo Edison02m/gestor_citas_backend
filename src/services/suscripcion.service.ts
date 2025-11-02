@@ -22,16 +22,6 @@ const JERARQUIA_PLANES: Record<string, number> = {
 };
 
 /**
- * Compara dos planes y determina cuál es superior
- * @returns true si planActual es superior o igual al planNuevo
- */
-function esPlanSuperiorOIgual(planActual: string, planNuevo: string): boolean {
-  const jerarquiaActual = JERARQUIA_PLANES[planActual] ?? 0;
-  const jerarquiaNuevo = JERARQUIA_PLANES[planNuevo] ?? 0;
-  return jerarquiaActual >= jerarquiaNuevo;
-}
-
-/**
  * Compara dos planes y determina si el actual es estrictamente superior
  * @returns true si planActual es superior (no igual) al planNuevo
  */
