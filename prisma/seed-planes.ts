@@ -105,7 +105,7 @@ async function seedPlanes() {
       console.log(`   Servicios: ${plan.limiteServicios ?? '∞'}`);
       console.log(`   Clientes: ${plan.limiteClientes ?? '∞'}`);
       console.log(`   Citas/mes: ${plan.limiteCitasMes ?? '∞'}`);
-      const whatsapp = plan.limiteWhatsAppMes ?? (plan.precio === 0 ? 'No disponible' : '∞');
+      const whatsapp = plan.limiteWhatsAppMes ?? (plan.precio.toNumber() === 0 ? 'No disponible' : '∞');
       console.log(`   WhatsApp/mes: ${whatsapp}`);
       console.log('');
     }
