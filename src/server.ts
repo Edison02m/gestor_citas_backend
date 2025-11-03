@@ -17,6 +17,7 @@ import { publicAgendaRoutes } from './routes/public-agenda.routes';
 import { planesRoutes } from './routes/planes.routes';
 import { configuracionPlanesRoutes } from './routes/configuracion-planes.routes';
 import { enviosRoutes } from './routes/envios.routes';
+import { whatsappRoutes } from './routes/whatsapp.routes';
 import planesScheduler from './services/planes-scheduler.service';
 
 // Cargar variables de entorno
@@ -87,6 +88,9 @@ app.register(citaRoutes, { prefix: '/api/citas' });
 
 // Registrar rutas de envíos (emails y WhatsApp)
 app.register(enviosRoutes, { prefix: '/api/envios' });
+
+// Registrar rutas de WhatsApp (Evolution API)
+app.register(whatsappRoutes, { prefix: '/api/whatsapp' });
 
 // Registrar rutas de planes
 app.register(planesRoutes, { prefix: '/api' });

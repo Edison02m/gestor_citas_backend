@@ -91,6 +91,31 @@ class UsoRecursosService {
   }
 
   /**
+   * Verifica si puede enviar WhatsApp según el límite del plan
+   */
+  async puedeEnviarWhatsApp(negocioId: string): Promise<boolean> {
+    const negocio = await prisma.negocio.findUnique({
+      where: { id: negocioId },
+      select: { limiteWhatsAppMes: true },
+    });
+
+    // Si limiteWhatsAppMes es null = ilimitado (PRO PLUS)
+    if (!negocio || negocio.limiteWhatsAppMes === null) {
+      return true;
+    }
+
+    // Si el límite es 0 o negativo, no puede enviar
+    if (negocio.limiteWhatsAppMes <= 0) {
+      return false;
+    }
+
+    const usoActual = await this.obtenerOCrearRegistroMesActual(negocioId);
+
+    // Verificar si ya alcanzó el límite
+    return usoActual.whatsappEnviados < negocio.limiteWhatsAppMes;
+  }
+
+  /**
    * Obtiene el uso actual del mes
    */
   async obtenerUsoActual(negocioId: string) {

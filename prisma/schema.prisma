@@ -104,6 +104,13 @@ model Negocio {
   mensajeRecordatorio   String? @default("Hola {cliente}, te recordamos tu cita el {fecha} a las {hora} en {negocio}. ¡Te esperamos!")
   mensajeReagendamiento String? @default("Hola {cliente}, tu cita ha sido reagendada para el {fecha} a las {hora}. Gracias por tu comprensión.")
 
+  // WHATSAPP CONFIGURATION (Evolution API)
+  whatsappInstanceId    String?   // ID de la instancia en Evolution (ej: "negocio_abc123")
+  whatsappConnected     Boolean   @default(false) // Estado de conexión
+  whatsappPhoneNumber   String?   // Número vinculado (ej: "593991234567")
+  whatsappQrCode        String?   @db.Text // QR Code base64 (temporal)
+  whatsappConfiguredAt  DateTime? // Fecha de última configuración
+
   // RELACIONES
   sucursales      Sucursal[]
   servicios       Servicio[]

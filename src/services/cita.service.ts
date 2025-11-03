@@ -11,6 +11,7 @@ import {
 } from '../models/cita.model';
 import { emailService } from '../emails/EmailService';
 import enviosService from './envios.service';
+import { WhatsAppNotificacionService } from './whatsapp-notificacion.service';
 
 export class CitaService {
   private citaRepository: CitaRepository;
@@ -207,8 +208,21 @@ export class CitaService {
       }),
     });
 
-    // 7. Enviar email de confirmación (asíncrono, no bloquea la respuesta)
-    if (cliente.email) {
+    // 7. Obtener información del negocio para notificaciones (UNA SOLA QUERY)
+    const negocio = await this.prisma.negocio.findUnique({
+      where: { id: negocioId },
+      select: {
+        nombre: true,
+        notificacionesEmail: true,
+        notificacionesWhatsApp: true,
+        whatsappConnected: true, // ✅ Agregado para verificación temprana
+        whatsappInstanceId: true, // ✅ Agregado para envío directo
+        mensajeRecordatorio: true, // ✅ Agregado para mensaje personalizado
+      },
+    });
+
+    // 8. Enviar EMAIL de confirmación (si está habilitado)
+    if (cliente.email && negocio?.notificacionesEmail) {
       // Validar límite de emails antes de enviar
       const puedeEnviar = await enviosService.puedeEnviarEmail(negocioId);
       
@@ -221,6 +235,25 @@ export class CitaService {
         console.warn(`⚠️ No se envió email: ${puedeEnviar.mensaje}`);
         console.warn(`   Emails usados: ${puedeEnviar.usado}/${puedeEnviar.limite}`);
       }
+    }
+
+    // 9. Enviar WHATSAPP de confirmación (si está habilitado Y conectado)
+    // ✅ VERIFICACIÓN TEMPRANA: Solo llama al servicio si está habilitado Y conectado
+    if (negocio?.notificacionesWhatsApp && negocio?.whatsappConnected && negocio?.whatsappInstanceId) {
+      // Pasar datos ya obtenidos para evitar queries adicionales
+      this.enviarWhatsAppConfirmacion(
+        cita.id,
+        negocioId,
+        cliente,
+        servicio,
+        sucursal,
+        negocio
+      ).catch((err: Error) => {
+        console.error('Error enviando WhatsApp de confirmación:', err);
+        // No lanzamos el error para que no falle la creación de la cita
+      });
+    } else if (negocio?.notificacionesWhatsApp && !negocio?.whatsappConnected) {
+      console.warn(`⚠️ WhatsApp habilitado pero no conectado para negocio ${negocio.nombre}`);
     }
 
     return cita;
@@ -1357,6 +1390,75 @@ export class CitaService {
         console.error('Error registrando envío fallido:', registroError);
       }
       
+      // No lanzamos el error para que no afecte la creación de la cita
+    }
+  }
+
+  /**
+   * Enviar confirmación de cita por WhatsApp
+   * También registra el envío en la base de datos
+   * ✅ OPTIMIZADO: Recibe datos ya obtenidos, evita queries adicionales
+   */
+  private async enviarWhatsAppConfirmacion(
+    citaId: string,
+    negocioId: string,
+    cliente: any,
+    servicio: any,
+    sucursal: any,
+    negocio: any
+  ): Promise<void> {
+    try {
+      // ✅ Ya no necesita hacer query a la BD, usa datos pasados como parámetros
+      
+      if (!cliente.telefono) {
+        console.log('⚠️  No se puede enviar WhatsApp: cliente sin teléfono');
+        return;
+      }
+
+      // Obtener la fecha de la cita recién creada
+      const citaCreada = await this.prisma.cita.findUnique({
+        where: { id: citaId },
+        select: { fecha: true, horaInicio: true, horaFin: true },
+      });
+
+      if (!citaCreada) {
+        console.log('⚠️  No se puede enviar WhatsApp: cita no encontrada');
+        return;
+      }
+
+      // Log de datos que se enviarán
+      console.log('📱 Preparando WhatsApp con los siguientes datos:');
+      console.log(`   Cliente: ${cliente.nombre} (${cliente.telefono})`);
+      console.log(`   Negocio: ${negocio.nombre || 'SIN NOMBRE'}`);
+      console.log(`   Servicio: ${servicio.nombre}`);
+      console.log(`   Fecha: ${citaCreada.fecha}`);
+      console.log(`   Hora: ${citaCreada.horaInicio}`);
+
+      // Crear instancia del servicio de WhatsApp
+      const whatsappService = new WhatsAppNotificacionService(this.prisma);
+
+      // Enviar WhatsApp
+      const resultado = await whatsappService.enviarConfirmacionCita(
+        negocioId,
+        citaId,
+        {
+          clienteNombre: cliente.nombre,
+          clienteTelefono: cliente.telefono,
+          fecha: citaCreada.fecha.toISOString().split('T')[0], // "YYYY-MM-DD"
+          horaInicio: citaCreada.horaInicio,
+          horaFin: citaCreada.horaFin,
+          servicioNombre: servicio.nombre,
+          negocioNombre: negocio.nombre || 'Nuestro Negocio',
+          sucursalNombre: sucursal.nombre,
+        }
+      );
+
+      if (resultado.success) {
+        console.log(`✅ WhatsApp de confirmación enviado a ${cliente.telefono}`);
+      }
+      // No loguear error aquí porque ya se registra en whatsapp-notificacion.service.ts
+    } catch (error) {
+      console.error('❌ Error en enviarWhatsAppConfirmacion:', error);
       // No lanzamos el error para que no afecte la creación de la cita
     }
   }
