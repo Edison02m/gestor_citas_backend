@@ -172,8 +172,9 @@ export class NegocioService {
     }
 
     // Validar que los mensajes contengan las variables necesarias
+    // Solo requerimos cliente y fecha. Hora puede ser {hora}, {hora_inicio} o {hora_fin}
     if (dto.mensajeRecordatorio !== undefined) {
-      const variablesRequeridas = ['{cliente}', '{fecha}', '{hora}'];
+      const variablesRequeridas = ['{cliente}', '{fecha}'];
       const faltanVariables = variablesRequeridas.filter(v => !dto.mensajeRecordatorio?.includes(v));
       if (faltanVariables.length > 0) {
         throw new Error(`El mensaje de recordatorio debe incluir: ${faltanVariables.join(', ')}`);
@@ -181,7 +182,7 @@ export class NegocioService {
     }
 
     if (dto.mensajeReagendamiento !== undefined) {
-      const variablesRequeridas = ['{cliente}', '{fecha}', '{hora}'];
+      const variablesRequeridas = ['{cliente}', '{fecha}'];
       const faltanVariables = variablesRequeridas.filter(v => !dto.mensajeReagendamiento?.includes(v));
       if (faltanVariables.length > 0) {
         throw new Error(`El mensaje de reagendamiento debe incluir: ${faltanVariables.join(', ')}`);

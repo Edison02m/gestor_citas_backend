@@ -13,6 +13,13 @@ interface DatosCita {
   servicioNombre: string;
   negocioNombre: string;
   sucursalNombre?: string;
+  // Nuevos campos opcionales para personalización de mensajes
+  empleadoNombre?: string;
+  sucursalDireccion?: string;
+  sucursalCiudad?: string;
+  sucursalTelefono?: string;
+  sucursalMaps?: string;
+  precio?: string;
 }
 
 export class WhatsAppNotificacionService {
@@ -20,15 +27,38 @@ export class WhatsAppNotificacionService {
 
   /**
    * Reemplazar variables en el mensaje personalizado
+   * Solo procesa las variables que están presentes en el mensaje para mejor rendimiento
    */
   private reemplazarVariables(mensaje: string, datos: DatosCita): string {
-    return mensaje
-      .replace(/{cliente}/g, datos.clienteNombre)
-      .replace(/{fecha}/g, this.formatearFecha(datos.fecha))
-      .replace(/{hora}/g, datos.horaInicio)
-      .replace(/{negocio}/g, datos.negocioNombre)
-      .replace(/{servicio}/g, datos.servicioNombre)
-      .replace(/{sucursal}/g, datos.sucursalNombre || '');
+    // Mapa de todas las variables disponibles con sus valores
+    const variables: { [key: string]: string } = {
+      '{cliente}': datos.clienteNombre,
+      '{fecha}': this.formatearFecha(datos.fecha),
+      '{hora}': datos.horaInicio, // Mantener compatibilidad
+      '{hora_inicio}': datos.horaInicio,
+      '{hora_fin}': datos.horaFin,
+      '{negocio}': datos.negocioNombre,
+      '{servicio}': datos.servicioNombre,
+      '{sucursal}': datos.sucursalNombre || '',
+      '{empleado}': datos.empleadoNombre || '',
+      '{direccion}': datos.sucursalDireccion || '',
+      '{ciudad}': datos.sucursalCiudad || '',
+      '{telefono_sucursal}': datos.sucursalTelefono || '',
+      '{maps}': datos.sucursalMaps || '',
+      '{precio}': datos.precio || '',
+    };
+
+    // Reemplazar solo las variables que están en el mensaje
+    let mensajePersonalizado = mensaje;
+    
+    for (const [variable, valor] of Object.entries(variables)) {
+      // Solo procesar si la variable está en el mensaje
+      if (mensajePersonalizado.includes(variable)) {
+        mensajePersonalizado = mensajePersonalizado.replace(new RegExp(variable.replace(/[{}]/g, '\\$&'), 'g'), valor);
+      }
+    }
+
+    return mensajePersonalizado;
   }
 
   /**

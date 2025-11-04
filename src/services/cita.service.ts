@@ -1415,10 +1415,18 @@ export class CitaService {
         return;
       }
 
-      // Obtener la fecha de la cita recién creada
+      // Obtener la fecha de la cita recién creada con empleado y precio
       const citaCreada = await this.prisma.cita.findUnique({
         where: { id: citaId },
-        select: { fecha: true, horaInicio: true, horaFin: true },
+        select: { 
+          fecha: true, 
+          horaInicio: true, 
+          horaFin: true, 
+          precioTotal: true,
+          empleado: {
+            select: { nombre: true }
+          }
+        },
       });
 
       if (!citaCreada) {
@@ -1450,6 +1458,13 @@ export class CitaService {
           servicioNombre: servicio.nombre,
           negocioNombre: negocio.nombre || 'Nuestro Negocio',
           sucursalNombre: sucursal.nombre,
+          // Nuevos campos opcionales para personalización de mensajes
+          empleadoNombre: citaCreada.empleado?.nombre,
+          sucursalDireccion: sucursal.direccion,
+          sucursalCiudad: sucursal.ciudad || undefined,
+          sucursalTelefono: sucursal.telefono,
+          sucursalMaps: sucursal.googleMapsUrl || undefined,
+          precio: citaCreada.precioTotal.toString(),
         }
       );
 
