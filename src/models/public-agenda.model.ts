@@ -55,6 +55,7 @@ export interface SucursalPublicaResponse {
   nombre: string;
   direccion: string;
   telefono: string;
+  googleMapsUrl?: string;
   ciudad: string;
   estado: string;
   // No incluir horarios aquí - se obtienen al calcular disponibilidad

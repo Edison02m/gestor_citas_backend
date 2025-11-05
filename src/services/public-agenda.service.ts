@@ -70,6 +70,7 @@ export class PublicAgendaService {
         nombre: true,
         direccion: true,
         telefono: true,
+        googleMapsUrl: true,
         ciudad: true,
         estado: true,
         horarios: {
@@ -92,6 +93,7 @@ export class PublicAgendaService {
     return sucursales.map(s => ({
       ...s,
       ciudad: s.ciudad || '', // Manejar null
+      googleMapsUrl: s.googleMapsUrl || undefined, // Convertir null a undefined
     }));
   }
 
@@ -217,11 +219,14 @@ export class PublicAgendaService {
     // IMPORTANTE: Validar suscripción activa del negocio
     await this.validarSuscripcionActiva(negocio.id);
 
-    // 1. Buscar cliente existente por cédula
+    // 1. Buscar cliente existente por cédula O teléfono (ambos deben ser únicos)
     let cliente = await this.prisma.cliente.findFirst({
       where: {
         negocioId: negocio.id,
-        cedula: dto.clienteCedula,
+        OR: [
+          { cedula: dto.clienteCedula },
+          { telefono: dto.clienteTelefono }
+        ]
       },
     });
 
@@ -256,6 +261,10 @@ export class PublicAgendaService {
       
       if (dto.clienteEmail && dto.clienteEmail.trim() !== '' && cliente.email !== dto.clienteEmail) {
         actualizaciones.email = dto.clienteEmail;
+      }
+      
+      if (dto.clienteCedula && dto.clienteCedula.trim() !== '' && cliente.cedula !== dto.clienteCedula) {
+        actualizaciones.cedula = dto.clienteCedula;
       }
 
       if (Object.keys(actualizaciones).length > 0) {

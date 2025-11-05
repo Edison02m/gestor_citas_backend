@@ -1,6 +1,7 @@
 // src/services/limites.service.ts
 
 import prisma from '../database/prisma';
+import usoRecursosService from './uso-recursos.service';
 
 /**
  * Servicio para validar límites del plan de suscripción
@@ -135,23 +136,9 @@ class LimitesService {
       return;
     }
 
-    // Obtener mes y año actual
-    const now = new Date();
-    const mes = now.getMonth() + 1; // 1-12
-    const anio = now.getFullYear();
-
-    // Buscar registro de uso del mes actual
-    const usoRecursos = await prisma.usoRecursos.findUnique({
-      where: {
-        negocioId_mes_anio: {
-          negocioId,
-          mes,
-          anio,
-        },
-      },
-    });
-
-    const citasCreadas = usoRecursos?.citasCreadas || 0;
+    // Obtener uso actual del ciclo
+    const usoActual = await usoRecursosService.obtenerUsoActual(negocioId);
+    const citasCreadas = usoActual.citasCreadas;
 
     if (citasCreadas >= negocio.limiteCitasMes) {
       throw new Error(
@@ -185,23 +172,9 @@ class LimitesService {
       return;
     }
 
-    // Obtener mes y año actual
-    const now = new Date();
-    const mes = now.getMonth() + 1;
-    const anio = now.getFullYear();
-
-    // Buscar registro de uso del mes actual
-    const usoRecursos = await prisma.usoRecursos.findUnique({
-      where: {
-        negocioId_mes_anio: {
-          negocioId,
-          mes,
-          anio,
-        },
-      },
-    });
-
-    const whatsappEnviados = usoRecursos?.whatsappEnviados || 0;
+    // Obtener uso actual del ciclo
+    const usoActual = await usoRecursosService.obtenerUsoActual(negocioId);
+    const whatsappEnviados = usoActual.whatsappEnviados;
 
     if (whatsappEnviados >= negocio.limiteWhatsAppMes) {
       throw new Error(
@@ -236,19 +209,8 @@ class LimitesService {
       where: { negocioId },
     });
 
-    const now = new Date();
-    const mes = now.getMonth() + 1;
-    const anio = now.getFullYear();
-
-    const usoRecursos = await prisma.usoRecursos.findUnique({
-      where: {
-        negocioId_mes_anio: {
-          negocioId,
-          mes,
-          anio,
-        },
-      },
-    });
+    // Obtener uso actual del ciclo usando el servicio de uso-recursos
+    const usoActual = await usoRecursosService.obtenerUsoActual(negocioId);
 
     // Calcular porcentaje con redondeo a 0 decimales
     const calcularPorcentaje = (usado: number, limite: number | null): number => {
@@ -256,15 +218,15 @@ class LimitesService {
       return Math.round((usado / limite) * 100);
     };
 
-    // Contar emails enviados este mes usando RegistroEnvio
+    // Contar emails enviados en el ciclo actual usando RegistroEnvio
     const emailsEnviados = await prisma.registroEnvio.count({
       where: {
         negocioId,
         tipo: 'EMAIL',
         exitoso: true,
         createdAt: {
-          gte: new Date(anio, mes - 1, 1, 0, 0, 0),
-          lte: new Date(anio, mes, 0, 23, 59, 59),
+          gte: usoActual.cicloInicio,
+          lte: usoActual.cicloFin,
         },
       },
     });
@@ -291,14 +253,14 @@ class LimitesService {
         porcentaje: calcularPorcentaje(clientesActuales, negocio.limiteClientes),
       },
       citasMes: {
-        usado: usoRecursos?.citasCreadas || 0,
+        usado: usoActual.citasCreadas,
         limite: negocio.limiteCitasMes,
-        porcentaje: calcularPorcentaje(usoRecursos?.citasCreadas || 0, negocio.limiteCitasMes),
+        porcentaje: calcularPorcentaje(usoActual.citasCreadas, negocio.limiteCitasMes),
       },
       whatsappMes: {
-        usado: usoRecursos?.whatsappEnviados || 0,
+        usado: usoActual.whatsappEnviados,
         limite: negocio.limiteWhatsAppMes,
-        porcentaje: calcularPorcentaje(usoRecursos?.whatsappEnviados || 0, negocio.limiteWhatsAppMes),
+        porcentaje: calcularPorcentaje(usoActual.whatsappEnviados, negocio.limiteWhatsAppMes),
       },
       emailMes: {
         usado: emailsEnviados,

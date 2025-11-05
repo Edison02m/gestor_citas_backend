@@ -14,7 +14,9 @@
     "test": "tsx src/tests/cita.service.test.ts",
     "test:watch": "tsx watch src/tests/cita.service.test.ts",
     "test:planes": "tsx src/tests/planes-system.test.ts",
-    "test:cola": "tsx src/tests/suscripcion-cola.test.ts"
+    "test:cola": "tsx src/tests/suscripcion-cola.test.ts",
+    "test:uso-recursos": "tsx src/tests/uso-recursos.test.ts",
+    "test:suscripcion-fechas": "tsx src/tests/suscripcion-fechas.test.ts"
   },
   "keywords": [
     "fastify",

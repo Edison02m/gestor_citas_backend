@@ -76,6 +76,7 @@ model Negocio {
   // AGENDA PÚBLICA
   linkPublico   String?  @unique // Link único para agenda pública (ej: "salon-maria-abc123")
   agendaPublica Boolean  @default(true) // Habilitar/deshabilitar agenda pública
+  mostrarPreciosAgenda Boolean @default(true) // Mostrar precios de servicios en agenda pública
 
   // LÍMITES DEL PLAN (null = ilimitado)
   limiteSucursales  Int? // 1 (GRATIS), 5 (PRO), null (PRO PLUS = ilimitado)
@@ -556,10 +557,10 @@ model UsoRecursos {
   negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
   negocioId String
 
-  mes  Int // 1-12
-  anio Int // 2025, 2026...
+  cicloInicio DateTime // Fecha de inicio del ciclo de facturación
+  cicloFin    DateTime // Fecha de fin del ciclo de facturación
 
-  // Contadores del mes actual
+  // Contadores del ciclo actual
   citasCreadas     Int @default(0)
   whatsappEnviados Int @default(0)
   emailsEnviados   Int @default(0)
@@ -567,8 +568,8 @@ model UsoRecursos {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([negocioId, mes, anio])
-  @@index([negocioId, anio, mes])
+  @@unique([negocioId, cicloInicio])
+  @@index([negocioId, cicloInicio, cicloFin])
 }
 
 // ============================================================================

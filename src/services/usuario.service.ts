@@ -7,6 +7,7 @@ import {
   UpdateUsuarioDto,
   UsuarioResponse,
 } from '../models/usuario.model';
+import usoRecursosService from './uso-recursos.service';
 
 export class UsuarioService {
   constructor(
@@ -159,11 +160,20 @@ export class UsuarioService {
         // 7. NO cambiar primerLogin aquí - se cambiará cuando complete el onboarding
         // El usuario tiene suscripción activa pero aún debe configurar su negocio
         
-        return usuario;
+        return { usuario, negocioId: negocio.id };
       });
 
+      // Crear el registro de UsoRecursos para el primer ciclo
+      // Esto asegura que el dashboard pueda cargar los datos de uso desde el primer día
+      try {
+        await usoRecursosService.obtenerUsoActual(resultado.negocioId);
+      } catch (error) {
+        console.warn('No se pudo crear el registro de UsoRecursos inicial:', error);
+        // No lanzar error, solo advertir - el registro se creará al primer uso
+      }
+
       // Obtener el usuario completo con toda la información
-      const usuarioCompleto = await this.usuarioRepository.findById(resultado.id);
+      const usuarioCompleto = await this.usuarioRepository.findById(resultado.usuario.id);
 
       if (!usuarioCompleto || !usuarioCompleto.negocio) {
         throw new Error('Error al crear usuario y negocio');

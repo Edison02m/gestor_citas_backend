@@ -66,6 +66,8 @@ export class SuscripcionService {
       throw new Error('Negocio no encontrado para este usuario');
     }
 
+    // ✅ Guardar en UTC - La conversión a zona horaria local se hace en el frontend
+    // El servidor SIEMPRE debe estar configurado en UTC para consistencia global
     const fechaActivacion = new Date();
 
     const resultado = await this.prisma.$transaction(async (tx) => {

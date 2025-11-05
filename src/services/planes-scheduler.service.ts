@@ -3,6 +3,7 @@
 import cron from 'node-cron';
 import { PrismaClient, EstadoSuscripcion } from '@prisma/client';
 import planesService from './planes.service';
+import usoRecursosService from './uso-recursos.service';
 
 const prisma = new PrismaClient();
 
@@ -24,8 +25,12 @@ class PlanesSchedulerService {
 
     // También ejecutar cada día a medianoche
     cron.schedule('0 0 * * *', async () => {
-      console.log('🔄 [Scheduler] Verificación diaria de planes pendientes...');
+      console.log('🔄 [Scheduler] Verificación diaria de planes pendientes y ciclos...');
       await this.procesarPlanesPendientes();
+      
+      // ✅ Verificar nuevos ciclos de UsoRecursos (reseteo mensual de límites)
+      console.log('🔄 [Scheduler] Verificando nuevos ciclos de uso de recursos...');
+      await usoRecursosService.verificarNuevosCiclos();
     });
 
     console.log('✅ Scheduler de planes iniciado');
