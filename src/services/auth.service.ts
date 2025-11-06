@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
 import { SuperAdminRepository } from '../repositories/superadmin.repository';
 import { UsuarioRepository } from '../repositories/usuario.repository';
-import { comparePassword } from '../utils/password.util';
+import { comparePassword, hashPassword } from '../utils/password.util';
 import { generateToken } from '../utils/jwt.util';
 import { SuscripcionVerificationService } from './suscripcion-verification.service';
+import { emailService } from '../emails/EmailService';
+import * as crypto from 'crypto';
 
 interface LoginDto {
   email: string;
@@ -219,5 +221,115 @@ export class AuthService {
         updatedAt: usuario.updatedAt,
       };
     }
+  }
+
+  /**
+   * Solicita la recuperación de contraseña
+   * Genera un token y envía email al usuario
+   */
+  async solicitarRecuperacionPassword(email: string): Promise<{ success: boolean; message: string }> {
+    // Buscar usuario por email
+    const usuario = await this.usuarioRepository.findByEmail(email);
+
+    if (!usuario) {
+      // Por seguridad, no revelamos si el email existe o no
+      return {
+        success: true,
+        message: 'Si el correo existe, recibirás instrucciones para recuperar tu contraseña',
+      };
+    }
+
+    // Generar token único
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Expiración en 1 hora
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1);
+
+    // Invalidar tokens anteriores del usuario
+    await this.prisma.passwordResetToken.updateMany({
+      where: {
+        usuarioId: usuario.id,
+        usado: false,
+      },
+      data: {
+        usado: true,
+      },
+    });
+
+    // Crear nuevo token en BD
+    await this.prisma.passwordResetToken.create({
+      data: {
+        token,
+        usuarioId: usuario.id,
+        expiresAt,
+      },
+    });
+
+    // Construir URL de recuperación
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetUrl = `${frontendUrl}/restablecer-contrasena/${token}`;
+
+    // Enviar email
+    const emailResult = await emailService.enviarRecuperacionPassword({
+      emailDestinatario: usuario.email,
+      nombreUsuario: usuario.nombre,
+      resetUrl,
+      expirationMinutes: 60,
+    });
+
+    if (!emailResult.success) {
+      console.error('Error al enviar email de recuperación:', emailResult.error);
+    }
+
+    return {
+      success: true,
+      message: 'Si el correo existe, recibirás instrucciones para recuperar tu contraseña',
+    };
+  }
+
+  /**
+   * Restablece la contraseña del usuario usando el token
+   */
+  async restablecerPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+    // Buscar token
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { usuario: true },
+    });
+
+    if (!resetToken) {
+      throw new Error('Token inválido o expirado');
+    }
+
+    // Validar que no esté usado
+    if (resetToken.usado) {
+      throw new Error('Este token ya fue utilizado');
+    }
+
+    // Validar que no esté expirado
+    if (new Date() > resetToken.expiresAt) {
+      throw new Error('Token expirado. Solicita uno nuevo');
+    }
+
+    // Hashear nueva contraseña
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Actualizar contraseña del usuario
+    await this.prisma.usuario.update({
+      where: { id: resetToken.usuarioId },
+      data: { password: hashedPassword },
+    });
+
+    // Marcar token como usado
+    await this.prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { usado: true },
+    });
+
+    return {
+      success: true,
+      message: 'Contraseña actualizada exitosamente',
+    };
   }
 }

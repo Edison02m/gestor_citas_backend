@@ -37,12 +37,31 @@ model Usuario {
   primerLogin Boolean    @default(true)
   activo      Boolean    @default(true)
   negocio     Negocio?
+  
+  // Relación con tokens de recuperación de contraseña
+  passwordResetTokens PasswordResetToken[]
+  
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   @@index([email])
   @@index([rol])
   @@index([activo])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique // Token único para recuperación
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId String
+  expiresAt DateTime // Fecha de expiración del token (ej: 1 hora)
+  usado     Boolean  @default(false) // Si el token ya fue usado
+  createdAt DateTime @default(now())
+  
+  @@index([token])
+  @@index([usuarioId])
+  @@index([expiresAt])
+  @@index([usado])
 }
 
 enum RolUsuario {
