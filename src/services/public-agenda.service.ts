@@ -40,6 +40,7 @@ export class PublicAgendaService {
         logo: true,
         descripcion: true,
         agendaPublica: true,
+        mostrarPreciosPublico: true,
       },
     });
 

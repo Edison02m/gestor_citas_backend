@@ -1,19 +1,25 @@
-import { Resend } from 'resend';
+import * as brevo from '@getbrevo/brevo';
 import * as React from 'react';
+// @ts-ignore - Ignorar error de tipos en react-dom/server
+import { renderToStaticMarkup } from 'react-dom/server';
 import { CitaConfirmacion } from './templates/CitaConfirmacion';
 
 export class EmailService {
-  private resend: Resend;
+  private apiInstance: brevo.TransactionalEmailsApi;
 
   constructor() {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = process.env.BREVO_API_KEY;
     
     if (!apiKey) {
-      console.warn('⚠️  RESEND_API_KEY no está configurada. Los emails no se enviarán.');
-      this.resend = new Resend('re_placeholder'); // Placeholder para evitar errores
-    } else {
-      this.resend = new Resend(apiKey);
+      console.warn('⚠️  BREVO_API_KEY no está configurada. Los emails no se enviarán.');
     }
+    
+    // Configurar la API de Brevo
+    this.apiInstance = new brevo.TransactionalEmailsApi();
+    this.apiInstance.setApiKey(
+      brevo.TransactionalEmailsApiApiKeys.apiKey,
+      apiKey || ''
+    );
   }
 
   /**
@@ -35,28 +41,22 @@ export class EmailService {
     googleMapsUrl?: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
     try {
-      // Validar que RESEND_API_KEY esté configurada
-      if (!process.env.RESEND_API_KEY) {
-        console.warn('⚠️  Email NO enviado: RESEND_API_KEY no configurada');
+      // Validar que BREVO_API_KEY esté configurada
+      if (!process.env.BREVO_API_KEY) {
+        console.warn('⚠️  Email NO enviado: BREVO_API_KEY no configurada');
         return {
           success: false,
-          error: 'RESEND_API_KEY no configurada',
+          error: 'BREVO_API_KEY no configurada',
         };
       }
 
       // Determinar el email FROM según el entorno
       const fromEmail = this.getFromEmail();
+      const fromName = this.getFromName();
 
-      // En desarrollo, redirigir todos los emails al dueño de la cuenta
-      const emailDestino = this.getEmailDestino(data.emailDestinatario);
-
-      console.log(`📧 Enviando email de confirmación a: ${emailDestino}`);
-
-      const { data: emailData, error } = await this.resend.emails.send({
-        from: fromEmail,
-        to: [emailDestino],
-        subject: `✅ Confirmación de cita - ${data.nombreNegocio}`,
-        react: React.createElement(CitaConfirmacion, {
+      // Renderizar el template de React a HTML
+      const htmlContent = renderToStaticMarkup(
+        React.createElement(CitaConfirmacion, {
           nombreCliente: data.nombreCliente,
           nombreNegocio: data.nombreNegocio,
           nombreServicio: data.nombreServicio,
@@ -67,74 +67,52 @@ export class EmailService {
           direccionSucursal: data.direccionSucursal,
           telefonoSucursal: data.telefonoSucursal,
           googleMapsUrl: data.googleMapsUrl,
-        }),
-      });
+        })
+      );
 
-      if (error) {
-        console.error('❌ Error al enviar email:', error);
-        return {
-          success: false,
-          error: error.message || 'Error desconocido al enviar email',
-        };
-      }
+      // Preparar el email para Brevo
+      const sendSmtpEmail: brevo.SendSmtpEmail = {
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: data.emailDestinatario, name: data.nombreCliente }],
+        subject: `Confirmación de cita - ${data.nombreNegocio}`,
+        htmlContent: htmlContent,
+      };
 
-      console.log(`✅ Email enviado exitosamente. ID: ${emailData?.id}`);
+      // Enviar el email
+      const response = await this.apiInstance.sendTransacEmail(sendSmtpEmail);
+
       return {
         success: true,
-        messageId: emailData?.id,
+        messageId: response.body.messageId,
       };
-    } catch (error) {
-      console.error('❌ Excepción al enviar email:', error);
+    } catch (error: any) {
+      console.error('❌ Error al enviar email:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Error desconocido',
+        error: error?.message || error?.body?.message || 'Error desconocido al enviar email',
       };
     }
   }
 
   /**
    * Determina el email FROM según el entorno
-   * En desarrollo: usa emails de prueba de Resend
-   * En producción: usa el dominio verificado
    */
   private getFromEmail(): string {
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    
-    if (isDevelopment) {
-      // En desarrollo, usa el email de prueba de Resend
-      return 'onboarding@resend.dev';
-    } else {
-      // En producción, usa tu dominio verificado
-      const domain = process.env.EMAIL_FROM_DOMAIN || 'resend.dev';
-      const name = process.env.EMAIL_FROM_NAME || 'CitaYA';
-      return `${name} <noreply@${domain}>`;
-    }
+    return process.env.BREVO_FROM_EMAIL || 'noreply@ejemplo.com';
   }
 
   /**
-   * Determina el email de destino según el entorno
-   * En desarrollo sin dominio verificado: redirige al email del dueño de la cuenta
-   * En producción: envía al email real del cliente
+   * Determina el nombre FROM para los emails
    */
-  private getEmailDestino(emailCliente: string): string {
-    const isDevelopment = process.env.NODE_ENV !== 'production';
-    const testEmailOverride = process.env.RESEND_TEST_EMAIL;
-    
-    if (isDevelopment && testEmailOverride) {
-      // Si hay un email de testing configurado, usar ese
-      console.log(`🔄 [MODO TESTING] Email redirigido de ${emailCliente} → ${testEmailOverride}`);
-      return testEmailOverride;
-    }
-    
-    // En producción o sin override, usar el email del cliente
-    return emailCliente;
+  private getFromName(): string {
+    return process.env.EMAIL_FROM_NAME || 'CitaYA';
   }
 
   /**
    * Verifica si el servicio de email está configurado correctamente
    */
   isConfigured(): boolean {
-    return !!process.env.RESEND_API_KEY;
+    return !!process.env.BREVO_API_KEY;
   }
 }
 

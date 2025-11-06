@@ -48,6 +48,7 @@ export interface NegocioPublicoResponse {
   logo: string | null;
   descripcion: string | null;
   agendaPublica: boolean;
+  mostrarPreciosPublico: boolean;
 }
 
 export interface SucursalPublicaResponse {

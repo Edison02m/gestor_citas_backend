@@ -231,10 +231,8 @@ export class CitaService {
           console.error('Error enviando email de confirmación:', err);
           // No lanzamos el error para que no falle la creación de la cita
         });
-      } else {
-        console.warn(`⚠️ No se envió email: ${puedeEnviar.mensaje}`);
-        console.warn(`   Emails usados: ${puedeEnviar.usado}/${puedeEnviar.limite}`);
       }
+      // Si no puede enviar, simplemente no se envía (sin logs)
     }
 
     // 9. Enviar WHATSAPP de confirmación (si está habilitado Y conectado)
@@ -252,8 +250,6 @@ export class CitaService {
         console.error('Error enviando WhatsApp de confirmación:', err);
         // No lanzamos el error para que no falle la creación de la cita
       });
-    } else if (negocio?.notificacionesWhatsApp && !negocio?.whatsappConnected) {
-      console.warn(`⚠️ WhatsApp habilitado pero no conectado para negocio ${negocio.nombre}`);
     }
 
     return cita;
@@ -1308,16 +1304,6 @@ export class CitaService {
       // Formatear la hora (ej: "09:00 AM - 10:00 AM")
       const horaFormateada = `${cita.horaInicio} - ${cita.horaFin}`;
 
-      // Log de datos que se enviarán
-      console.log('📧 Preparando email con los siguientes datos:');
-      console.log(`   Cliente: ${cita.cliente.nombre} (${cita.cliente.email})`);
-      console.log(`   Negocio: ${cita.negocio.nombre || 'SIN NOMBRE'}`);
-      console.log(`   Servicio: ${cita.servicio.nombre}`);
-      console.log(`   Empleado: ${cita.empleado?.nombre || 'Sin asignar'}`);
-      console.log(`   Fecha: ${fechaFormateada}`);
-      console.log(`   Hora: ${horaFormateada}`);
-      console.log(`   Sucursal: ${cita.sucursal.nombre}`);
-
       // Enviar el email
       const resultado = await emailService.enviarConfirmacionCita({
         emailDestinatario: cita.cliente.email,
@@ -1334,8 +1320,6 @@ export class CitaService {
       });
 
       if (resultado.success) {
-        console.log(`✅ Email de confirmación enviado a ${cita.cliente.email}`);
-        
         // ✅ REGISTRAR EL ENVÍO EXITOSO
         await enviosService.registrarEnvio(
           negocioId,

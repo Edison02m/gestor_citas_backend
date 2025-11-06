@@ -34,6 +34,7 @@ export class NegocioService {
       usuarioId: negocio.usuarioId,
       linkPublico: negocio.linkPublico,
       agendaPublica: negocio.agendaPublica,
+      mostrarPreciosPublico: negocio.mostrarPreciosPublico,
       notificacionesWhatsApp: negocio.notificacionesWhatsApp,
       notificacionesEmail: negocio.notificacionesEmail,
       recordatorio1: negocio.recordatorio1,

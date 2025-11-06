@@ -176,6 +176,7 @@ export class NegocioRepository {
       data: {
         ...(data.linkPublico !== undefined && { linkPublico: data.linkPublico }),
         ...(data.agendaPublica !== undefined && { agendaPublica: data.agendaPublica }),
+        ...(data.mostrarPreciosPublico !== undefined && { mostrarPreciosPublico: data.mostrarPreciosPublico }),
       },
     });
   }

@@ -29,6 +29,7 @@
   "dependencies": {
     "@fastify/cors": "^8.4.2",
     "@fastify/jwt": "^10.0.0",
+    "@getbrevo/brevo": "^3.0.1",
     "@prisma/client": "^6.17.1",
     "@react-email/components": "^0.5.7",
     "bcrypt": "^6.0.0",
@@ -37,8 +38,7 @@
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^4.2.1",
     "prisma": "^6.17.1",
-    "react": "^19.2.0",
-    "resend": "^6.3.0"
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

@@ -11,6 +11,7 @@ export interface NegocioResponse {
   // Agenda pública
   linkPublico: string | null;
   agendaPublica: boolean;
+  mostrarPreciosPublico: boolean;
   
   // Notificaciones y Recordatorios
   notificacionesWhatsApp: boolean;
@@ -41,6 +42,7 @@ export interface UpdateNegocioDto {
 export interface UpdateAgendaPublicaDto {
   linkPublico?: string | null;
   agendaPublica?: boolean;
+  mostrarPreciosPublico?: boolean;
 }
 
 export interface UpdateNotificacionesDto {
