@@ -16,7 +16,18 @@
     "test:planes": "tsx src/tests/planes-system.test.ts",
     "test:cola": "tsx src/tests/suscripcion-cola.test.ts",
     "test:uso-recursos": "tsx src/tests/uso-recursos.test.ts",
-    "test:suscripcion-fechas": "tsx src/tests/suscripcion-fechas.test.ts"
+    "test:suscripcion-fechas": "tsx src/tests/suscripcion-fechas.test.ts",
+    "test:recordatorios": "tsx src/tests/test-recordatorios.ts",
+    "test:cita-proxima": "tsx src/tests/test-cita-proxima.ts",
+    "test:calculo-momento": "tsx src/tests/test-calculo-momento.ts",
+    "test:suite-completa": "tsx src/tests/test-suite-completa.ts",
+    "test:recordatorios-real": "tsx src/tests/test-recordatorios-real.ts",
+    "test:recordatorios-completo": "tsx src/tests/test-recordatorios-completo.ts",
+    "debug:hora-cita": "tsx src/tests/debug-hora-cita.ts",
+    "debug:recordatorios": "tsx src/tests/debug-recordatorios-detalle.ts",
+    "analisis:zona-horaria": "tsx src/tests/analisis-zona-horaria.ts",
+    "crear:cita-test": "tsx src/tests/crear-cita-test.ts",
+    "crear:cita-recordatorio": "tsx src/tests/crear-cita-recordatorio-proxima.ts"
   },
   "keywords": [
     "fastify",

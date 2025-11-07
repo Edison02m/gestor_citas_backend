@@ -37,6 +37,7 @@ export class NegocioService {
       mostrarPreciosPublico: negocio.mostrarPreciosPublico,
       notificacionesWhatsApp: negocio.notificacionesWhatsApp,
       notificacionesEmail: negocio.notificacionesEmail,
+      recordatoriosAutomaticos: negocio.recordatoriosAutomaticos,
       recordatorio1: negocio.recordatorio1,
       recordatorio2: negocio.recordatorio2,
       mensajeRecordatorio: negocio.mensajeRecordatorio,

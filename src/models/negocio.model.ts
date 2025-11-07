@@ -16,6 +16,7 @@ export interface NegocioResponse {
   // Notificaciones y Recordatorios
   notificacionesWhatsApp: boolean;
   notificacionesEmail: boolean;
+  recordatoriosAutomaticos: boolean; // Control de recordatorios automáticos (subswitch de WhatsApp)
   recordatorio1: number | null; // Minutos antes de la cita
   recordatorio2: number | null; // Recordatorio adicional opcional
   
@@ -48,6 +49,7 @@ export interface UpdateAgendaPublicaDto {
 export interface UpdateNotificacionesDto {
   notificacionesWhatsApp?: boolean;
   notificacionesEmail?: boolean;
+  recordatoriosAutomaticos?: boolean; // Control de recordatorios automáticos
   recordatorio1?: number | null; // Minutos (null = deshabilitado)
   recordatorio2?: number | null; // Opcional
 }

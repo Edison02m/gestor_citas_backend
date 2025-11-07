@@ -19,6 +19,7 @@ import { configuracionPlanesRoutes } from './routes/configuracion-planes.routes'
 import { enviosRoutes } from './routes/envios.routes';
 import { whatsappRoutes } from './routes/whatsapp.routes';
 import planesScheduler from './services/planes-scheduler.service';
+import recordatoriosScheduler from './services/recordatorios-scheduler.service';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -106,6 +107,9 @@ const start = async () => {
     
     // 🎯 Iniciar scheduler de planes pendientes
     planesScheduler.iniciar();
+    
+    // 📅 Iniciar scheduler de recordatorios automáticos
+    recordatoriosScheduler.iniciar();
   } catch (err) {
     app.log.error(err);
     process.exit(1);

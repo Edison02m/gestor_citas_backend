@@ -168,6 +168,87 @@ export class WhatsAppNotificacionService {
   }
 
   /**
+   * Enviar recordatorio automático de cita
+   * Usa el campo mensajeReagendamiento para recordatorios antes de la cita
+   */
+  async enviarRecordatorioCita(
+    negocioId: string,
+    citaId: string,
+    datosCita: DatosCita
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // 1. Obtener configuración del negocio
+      const negocio = await this.prisma.negocio.findUnique({
+        where: { id: negocioId },
+        select: {
+          nombre: true,
+          whatsappInstanceId: true,
+          whatsappConnected: true,
+          notificacionesWhatsApp: true,
+          mensajeReagendamiento: true, // ✅ Usar mensajeReagendamiento para recordatorios
+        },
+      });
+
+      if (!negocio) {
+        return { success: false, error: 'Negocio no encontrado' };
+      }
+
+      if (!negocio.whatsappConnected || !negocio.whatsappInstanceId) {
+        return { success: false, error: 'WhatsApp no configurado' };
+      }
+
+      if (!negocio.notificacionesWhatsApp) {
+        return { success: false, error: 'Notificaciones WhatsApp deshabilitadas' };
+      }
+
+      // 2. Verificar límite de WhatsApp
+      const puedeEnviar = await usoRecursosService.puedeEnviarWhatsApp(negocioId);
+      
+      if (!puedeEnviar) {
+        console.log(`⚠️ Límite de WhatsApp alcanzado para negocio ${negocio.nombre}`);
+        await this.registrarEnvio(negocioId, citaId, datosCita.clienteTelefono, false, 'Límite mensual alcanzado');
+        return { success: false, error: 'Límite mensual de WhatsApp alcanzado' };
+      }
+
+      // 3. Preparar mensaje de recordatorio personalizado
+      const mensaje = this.reemplazarVariables(
+        negocio.mensajeReagendamiento || 'Hola {cliente}, te recordamos tu cita el {fecha} a las {hora} en {negocio}. ¡No faltes!',
+        datosCita
+      );
+
+      // 4. Enviar mensaje a través de Evolution API
+      await evolutionApiService.sendTextMessage(
+        negocio.whatsappInstanceId,
+        datosCita.clienteTelefono,
+        mensaje
+      );
+
+      console.log(`✅ Recordatorio WhatsApp enviado a ${datosCita.clienteNombre} (${datosCita.clienteTelefono})`);
+
+      // 5. Registrar envío exitoso
+      await this.registrarEnvio(negocioId, citaId, datosCita.clienteTelefono, true);
+
+      // 6. Incrementar contador de WhatsApp del mes
+      await usoRecursosService.incrementarWhatsApp(negocioId);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ Error al enviar recordatorio WhatsApp:', error);
+
+      // Registrar envío fallido
+      await this.registrarEnvio(
+        negocioId,
+        citaId,
+        datosCita.clienteTelefono,
+        false,
+        error.message
+      );
+
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
    * Registrar el envío en la base de datos
    */
   private async registrarEnvio(

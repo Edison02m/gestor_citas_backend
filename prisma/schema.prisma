@@ -112,6 +112,7 @@ model Negocio {
   // NOTIFICACIONES Y RECORDATORIOS
   notificacionesWhatsApp Boolean @default(true)
   notificacionesEmail    Boolean @default(true)
+  recordatoriosAutomaticos Boolean @default(true) // Habilitar/deshabilitar recordatorios automáticos
   
   // Recordatorios configurables (en minutos antes de la cita, null = deshabilitado)
   recordatorio1 Int? @default(1440) // Por defecto 24 horas (1440 minutos) - Todos los planes
@@ -121,8 +122,8 @@ model Negocio {
   recordatorio5 Int? // Recordatorio adicional - Solo PRO PLUS
   
   // Mensajes personalizables para WhatsApp
-  mensajeRecordatorio   String? @default("Hola {cliente}, te recordamos tu cita el {fecha} a las {hora} en {negocio}. ¡Te esperamos!")
-  mensajeReagendamiento String? @default("Hola {cliente}, tu cita ha sido reagendada para el {fecha} a las {hora}. Gracias por tu comprensión.")
+  mensajeRecordatorio   String? @default("Hola {cliente}, tu cita ha sido confirmada para el {fecha} a las {hora} en {negocio}. ¡Te esperamos!")
+  mensajeReagendamiento String? @default("Hola {cliente}, te recordamos tu cita el {fecha} a las {hora} en {negocio}. No faltes!")
 
   // WHATSAPP CONFIGURATION (Evolution API)
   whatsappInstanceId    String?   // ID de la instancia en Evolution (ej: "negocio_abc123")
@@ -502,6 +503,10 @@ model Cita {
 
   // Relación con envíos
   registrosEnvios RegistroEnvio[]
+
+  // Recordatorios automáticos
+  recordatorioEnviado   Boolean   @default(false) // Si ya se envió el recordatorio
+  recordatorioEnviadoEn DateTime? // Fecha/hora en que se envió el recordatorio
 
   // Auditoría
   creadoPor     String? // ID del usuario que creó la cita
