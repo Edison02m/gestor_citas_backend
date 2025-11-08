@@ -19,6 +19,7 @@ import { configuracionPlanesRoutes } from './routes/configuracion-planes.routes'
 import { enviosRoutes } from './routes/envios.routes';
 import { whatsappRoutes } from './routes/whatsapp.routes';
 import { reportesRoutes } from './routes/reportes.routes';
+import { imagekitRoutes } from './routes/imagekit.routes';
 import planesScheduler from './services/planes-scheduler.service';
 import recordatoriosScheduler from './services/recordatorios-scheduler.service';
 
@@ -102,6 +103,9 @@ app.register(configuracionPlanesRoutes, { prefix: '/api/super-admin/planes' });
 
 // Registrar rutas de reportes y estadísticas
 app.register(reportesRoutes, { prefix: '/api/reportes' });
+
+// Registrar rutas de ImageKit (upload de imágenes)
+app.register(imagekitRoutes, { prefix: '/api/imagekit' });
 
 const start = async () => {
   try {

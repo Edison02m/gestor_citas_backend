@@ -225,6 +225,25 @@ export class NegocioService {
   }
 
   /**
+   * Actualizar logo del negocio
+   */
+  async actualizarLogo(
+    usuarioId: string,
+    logoUrl: string
+  ): Promise<NegocioResponse> {
+    // Validar que el negocio existe
+    const negocioExistente = await this.negocioRepository.findByUsuarioId(usuarioId);
+    if (!negocioExistente) {
+      throw new Error('Negocio no encontrado');
+    }
+
+    // Actualizar solo el campo logo
+    await this.negocioRepository.update(negocioExistente.id, { logo: logoUrl });
+
+    return this.obtenerNegocio(usuarioId);
+  }
+
+  /**
    * Normalizar un string para usarlo como link público
    */
   private normalizarLink(texto: string): string {

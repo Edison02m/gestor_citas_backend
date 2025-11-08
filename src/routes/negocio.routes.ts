@@ -45,4 +45,10 @@ export async function negocioRoutes(fastify: FastifyInstance) {
     '/negocio/generar-link',
     negocioController.generarLinkPublico.bind(negocioController)
   );
+
+  // Actualizar logo del negocio
+  fastify.patch(
+    '/negocio/logo',
+    negocioController.actualizarLogo.bind(negocioController)
+  );
 }

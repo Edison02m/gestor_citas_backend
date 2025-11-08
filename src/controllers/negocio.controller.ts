@@ -235,4 +235,59 @@ export class NegocioController {
       });
     }
   }
+
+  /**
+   * PATCH /api/negocio/logo
+   * Actualizar logo del negocio
+   * 
+   * Body esperado:
+   * {
+   *   logoUrl: string  // URL de ImageKit
+   * }
+   */
+  async actualizarLogo(request: FastifyRequest, reply: FastifyReply) {
+    try {
+      const user = (request as any).user;
+      const usuarioId = user.userId;
+      const { logoUrl } = request.body as { logoUrl: string };
+
+      // logoUrl puede ser string vacío para eliminar el logo, o URL válida
+      if (logoUrl === undefined || logoUrl === null) {
+        return reply.status(400).send({
+          success: false,
+          message: 'logoUrl es requerido (puede ser string vacío para eliminar)',
+        });
+      }
+
+      // Si logoUrl no está vacío, validar que sea URL válida
+      if (logoUrl !== '' && !logoUrl.startsWith('http://') && !logoUrl.startsWith('https://')) {
+        return reply.status(400).send({
+          success: false,
+          message: 'logoUrl debe ser una URL válida o string vacío',
+        });
+      }
+
+      const negocio = await this.negocioService.actualizarLogo(usuarioId, logoUrl);
+
+      return reply.status(200).send({
+        success: true,
+        data: negocio,
+        message: logoUrl ? 'Logo actualizado correctamente' : 'Logo eliminado correctamente',
+      });
+    } catch (error: any) {
+      console.error('Error al actualizar logo:', error);
+
+      if (error.message.includes('no encontrado')) {
+        return reply.status(404).send({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      return reply.status(500).send({
+        success: false,
+        message: error.message || 'Error al actualizar logo',
+      });
+    }
+  }
 }
