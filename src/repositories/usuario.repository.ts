@@ -64,6 +64,7 @@ export class UsuarioRepository {
             descripcion: true,
             estadoSuscripcion: true,
             codigoAplicado: true,
+            reportesAvanzados: true,
           },
         },
       },

@@ -122,6 +122,45 @@ export class CitaController {
   };
 
   /**
+   * GET /api/citas/cliente/:clienteId/historial
+   * Obtener el historial completo de citas de un cliente específico
+   * Ordenado por fecha descendente (más recientes primero)
+   */
+  obtenerHistorialCliente = async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const user = (request as any).user;
+      const { clienteId } = request.params as { clienteId: string };
+      const queryParams = request.query as any;
+
+      // ✅ Validar y sanitizar parámetros de paginación
+      const page = queryParams.page ? Math.max(1, parseInt(queryParams.page, 10)) : 1;
+      const limit = queryParams.limit 
+        ? Math.min(10, Math.max(1, parseInt(queryParams.limit, 10))) 
+        : 10; // Máximo 10 items por página
+      const estado = queryParams.estado; // Opcional: filtrar por estado
+
+      const resultado = await this.service.obtenerHistorialCliente(
+        user.negocioId,
+        clienteId,
+        page,
+        limit,
+        estado
+      );
+
+      return reply.status(200).send({
+        success: true,
+        data: resultado.citas,
+        pagination: resultado.pagination,
+      });
+    } catch (error: any) {
+      return reply.status(400).send({
+        success: false,
+        message: error.message || 'Error al obtener historial del cliente',
+      });
+    }
+  };
+
+  /**
    * GET /api/citas/fecha/:fecha
    * Obtener citas de un día específico
    */
@@ -422,29 +461,6 @@ export class CitaController {
       return reply.status(400).send({
         success: false,
         message: error.message || 'Error al obtener citas',
-      });
-    }
-  };
-
-  /**
-   * GET /api/citas/cliente/:clienteId/historial
-   * Obtener historial de citas de un cliente
-   */
-  obtenerHistorialCliente = async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const user = (request as any).user;
-      const { clienteId } = request.params as { clienteId: string };
-
-      const citas = await this.service.obtenerHistorialCliente(clienteId, user.negocioId);
-
-      return reply.status(200).send({
-        success: true,
-        data: citas,
-      });
-    } catch (error: any) {
-      return reply.status(400).send({
-        success: false,
-        message: error.message || 'Error al obtener historial',
       });
     }
   };

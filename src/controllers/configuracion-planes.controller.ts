@@ -178,6 +178,7 @@ export class ConfiguracionPlanesController {
           limiteCitasMes: datos.limiteCitasMes,
           limiteWhatsAppMes: datos.limiteWhatsAppMes,
           limiteEmailMes: datos.limiteEmailMes,
+          reportesAvanzados: datos.reportesAvanzados, // 🔥 Sincronizar reportes avanzados
         },
       });
 

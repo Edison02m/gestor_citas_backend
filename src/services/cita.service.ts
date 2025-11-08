@@ -276,6 +276,85 @@ export class CitaService {
   }
 
   /**
+   * Obtener historial completo de citas de un cliente específico
+   * Ordenado por fecha descendente (más recientes primero)
+   */
+  async obtenerHistorialCliente(
+    negocioId: string,
+    clienteId: string,
+    page: number = 1,
+    limit: number = 10,
+    estado?: string
+  ) {
+    // Verificar que el cliente existe y pertenece al negocio
+    const cliente = await this.prisma.cliente.findFirst({
+      where: { id: clienteId, negocioId },
+    });
+
+    if (!cliente) {
+      throw new Error('Cliente no encontrado o no pertenece a tu negocio');
+    }
+
+    // Construir filtros
+    const where: any = {
+      clienteId,
+      negocioId,
+    };
+
+    // Filtro opcional por estado
+    if (estado) {
+      where.estado = estado as EstadoCita;
+    }
+
+    // Calcular paginación
+    const skip = (page - 1) * limit;
+
+    // ✅ OPTIMIZACIÓN: Ejecutar count y findMany en paralelo para reducir tiempo de respuesta
+    const [total, citas] = await Promise.all([
+      this.prisma.cita.count({ where }),
+      this.prisma.cita.findMany({
+        where,
+        include: {
+          servicio: {
+            select: {
+              nombre: true,
+              precio: true,
+              color: true,
+            },
+          },
+          empleado: {
+            select: {
+              nombre: true,
+            },
+          },
+          sucursal: {
+            select: {
+              nombre: true,
+            },
+          },
+        },
+        orderBy: {
+          fecha: 'desc', // Más recientes primero
+        },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      citas,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    };
+  }
+
+  /**
    * Obtener citas de un día específico
    */
   async obtenerCitasPorFecha(negocioId: string, fecha: string, sucursalId?: string) {
@@ -749,22 +828,6 @@ export class CitaService {
 
     return await this.citaRepository.getProximasCitasCliente(clienteId);
   }
-
-  /**
-   * Obtener historial de citas de un cliente
-   */
-  async obtenerHistorialCliente(clienteId: string, negocioId: string) {
-    const cliente = await this.prisma.cliente.findFirst({
-      where: { id: clienteId, negocioId },
-    });
-
-    if (!cliente) {
-      throw new Error('Cliente no encontrado');
-    }
-
-    return await this.citaRepository.getHistorialCliente(clienteId);
-  }
-
   /**
    * Validar capacidad de la sucursal para una cita sin empleado asignado
    */

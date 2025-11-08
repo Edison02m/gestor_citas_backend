@@ -148,6 +148,7 @@ export class AuthService {
                 estadoSuscripcion: estadoSuscripcionActual || usuario.negocio.estadoSuscripcion,
                 fechaVencimiento: fechaVencimiento,
                 diasRestantes,
+                reportesAvanzados: usuario.negocio.reportesAvanzados,
               }
             : undefined,
         },
@@ -215,6 +216,7 @@ export class AuthService {
               estadoSuscripcion: estadoSuscripcionActual || usuario.negocio.estadoSuscripcion,
               fechaVencimiento: fechaVencimiento,
               diasRestantes,
+              reportesAvanzados: usuario.negocio.reportesAvanzados,
             }
           : undefined,
         createdAt: usuario.createdAt,

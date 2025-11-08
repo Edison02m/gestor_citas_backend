@@ -18,6 +18,7 @@ import { planesRoutes } from './routes/planes.routes';
 import { configuracionPlanesRoutes } from './routes/configuracion-planes.routes';
 import { enviosRoutes } from './routes/envios.routes';
 import { whatsappRoutes } from './routes/whatsapp.routes';
+import { reportesRoutes } from './routes/reportes.routes';
 import planesScheduler from './services/planes-scheduler.service';
 import recordatoriosScheduler from './services/recordatorios-scheduler.service';
 
@@ -98,6 +99,9 @@ app.register(planesRoutes, { prefix: '/api' });
 
 // Registrar rutas de configuración de planes (Super Admin)
 app.register(configuracionPlanesRoutes, { prefix: '/api/super-admin/planes' });
+
+// Registrar rutas de reportes y estadísticas
+app.register(reportesRoutes, { prefix: '/api/reportes' });
 
 const start = async () => {
   try {

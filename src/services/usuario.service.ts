@@ -83,6 +83,7 @@ export class UsuarioService {
             limiteClientes: configPlanGratis.limiteClientes,
             limiteCitasMes: configPlanGratis.limiteCitasMes,
             limiteWhatsAppMes: configPlanGratis.limiteWhatsAppMes,
+            limiteEmailMes: configPlanGratis.limiteEmailMes,
             reportesAvanzados: configPlanGratis.reportesAvanzados,
           },
         });

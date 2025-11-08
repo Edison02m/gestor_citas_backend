@@ -36,7 +36,7 @@ async function seedPlanes() {
       limiteCitasMes: null, // Ilimitado
       limiteWhatsAppMes: 300,
       limiteEmailMes: 300,
-      reportesAvanzados: false,
+      reportesAvanzados: true, // ✅ PRO tiene reportes avanzados
       duracionDias: 30,
       precio: 10,
     },
@@ -51,7 +51,7 @@ async function seedPlanes() {
       limiteCitasMes: null, // Ilimitado
       limiteWhatsAppMes: 300,
       limiteEmailMes: 300,
-      reportesAvanzados: false,
+      reportesAvanzados: true, // ✅ PRO tiene reportes avanzados
       duracionDias: 365,
       precio: 9, // $9/mes pagado anualmente
     },
