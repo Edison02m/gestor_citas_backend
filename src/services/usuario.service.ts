@@ -1,141 +1,194 @@
-// src/services/usuario.service.ts
-
 import { UsuarioRepository } from '../repositories/usuario.repository';
 import { NegocioRepository } from '../repositories/negocio.repository';
+import { PrismaClient, PlanSuscripcion } from '@prisma/client';
 import { hashPassword, comparePassword } from '../utils/password.util';
-import { generateToken } from '../utils/jwt.util';
 import {
   CreateUsuarioDto,
   UpdateUsuarioDto,
   UsuarioResponse,
-  LoginUsuarioDto,
-  LoginUsuarioResponse,
 } from '../models/usuario.model';
+import usoRecursosService from './uso-recursos.service';
 
 export class UsuarioService {
   constructor(
     private usuarioRepository: UsuarioRepository,
-    private negocioRepository: NegocioRepository
+    private negocioRepository: NegocioRepository,
+    private prisma: PrismaClient
   ) {}
 
-  /**
-   * Registrar un nuevo usuario con su negocio
-   * Usa transacción para garantizar atomicidad
-   */
   async register(dto: CreateUsuarioDto): Promise<UsuarioResponse> {
-    // Validar que el email no exista
     const emailExists = await this.usuarioRepository.emailExists(dto.email);
     if (emailExists) {
       throw new Error('El email ya está registrado');
     }
 
-    // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(dto.email)) {
       throw new Error('Email inválido');
     }
 
-    // Validar contraseña
     if (dto.password.length < 6) {
       throw new Error('La contraseña debe tener al menos 6 caracteres');
     }
 
-    // Validar nombre del negocio
     if (!dto.nombre || dto.nombre.trim().length < 2) {
+      throw new Error('El nombre del usuario debe tener al menos 2 caracteres');
+    }
+
+    if (!dto.nombreNegocio || dto.nombreNegocio.trim().length < 2) {
       throw new Error('El nombre del negocio debe tener al menos 2 caracteres');
     }
 
-    // Validar teléfono
     if (!dto.telefono || dto.telefono.trim().length < 7) {
       throw new Error('El teléfono debe tener al menos 7 caracteres');
     }
 
-    // Hashear contraseña
     const hashedPassword = await hashPassword(dto.password);
 
     try {
-      // Crear usuario
-      const usuario = await this.usuarioRepository.create({
-        email: dto.email,
-        password: hashedPassword,
+      // Crear usuario, negocio y suscripción de prueba en una transacción
+      const resultado = await this.prisma.$transaction(async (tx) => {
+        // 1. Crear el usuario
+        const usuario = await tx.usuario.create({
+          data: {
+            nombre: dto.nombre.trim(),
+            email: dto.email,
+            password: hashedPassword,
+          },
+        });
+
+        // 2. Obtener configuración del plan GRATIS desde la base de datos
+        const configPlanGratis = await tx.configuracionPlanes.findUnique({
+          where: { plan: PlanSuscripcion.GRATIS },
+        });
+
+        if (!configPlanGratis) {
+          throw new Error('Configuración del plan GRATIS no encontrada');
+        }
+
+        // 2.1 Crear el negocio con límites del plan GRATIS
+        const negocio = await tx.negocio.create({
+          data: {
+            nombre: dto.nombreNegocio.trim(),
+            telefono: dto.telefono.trim(),
+            logo: dto.logo,
+            descripcion: dto.descripcion?.trim(),
+            usuarioId: usuario.id,
+            estadoSuscripcion: 'ACTIVA',
+            codigoAplicado: true,
+            // Asignar límites del plan GRATIS directamente
+            limiteSucursales: configPlanGratis.limiteSucursales,
+            limiteEmpleados: configPlanGratis.limiteEmpleados,
+            limiteServicios: configPlanGratis.limiteServicios,
+            limiteClientes: configPlanGratis.limiteClientes,
+            limiteCitasMes: configPlanGratis.limiteCitasMes,
+            limiteWhatsAppMes: configPlanGratis.limiteWhatsAppMes,
+            limiteEmailMes: configPlanGratis.limiteEmailMes,
+            reportesAvanzados: configPlanGratis.reportesAvanzados,
+          },
+        });
+
+        // 3. Crear código de suscripción de prueba automático
+        const codigoPrueba = await tx.codigoSuscripcion.create({
+          data: {
+            codigo: `PRUEBA-${Date.now()}-${usuario.id.substring(0, 8)}`,
+            plan: PlanSuscripcion.GRATIS, // Cambiar de PRUEBA a GRATIS
+            duracionDias: 14, // 14 días de prueba gratuita
+            descripcion: 'Período de prueba gratuito de 14 días',
+            precio: 0,
+            usado: true,
+            fechaUso: new Date(),
+            vecesUsado: 1,
+            motivoCreacion: 'Registro automático con período de prueba',
+            notas: `Generado automáticamente para ${dto.email}`,
+          },
+        });
+
+        // 4. Crear la suscripción activa
+        const fechaActivacion = new Date();
+        const fechaVencimiento = new Date();
+        fechaVencimiento.setDate(fechaVencimiento.getDate() + 14); // 14 días desde hoy
+
+        const suscripcion = await tx.suscripcion.create({
+          data: {
+            negocioId: negocio.id,
+            codigoId: codigoPrueba.id,
+            fechaActivacion,
+            fechaVencimiento,
+            activa: true,
+            renovacionAuto: false,
+          },
+        });
+
+        // 5. Registrar en historial - REGISTRO
+        await tx.historialSuscripcion.create({
+          data: {
+            suscripcionId: suscripcion.id,
+            accion: 'REGISTRO',
+            descripcion: `Nuevo negocio registrado: ${dto.nombreNegocio}. Usuario: ${dto.email}`,
+            codigoUsado: null,
+            realizadoPor: usuario.id,
+            metadata: {
+              nombreNegocio: dto.nombreNegocio,
+              emailUsuario: dto.email,
+              nombreUsuario: dto.nombre,
+            },
+          },
+        });
+
+        // 6. Registrar en historial - ACTIVACION AUTOMÁTICA
+        await tx.historialSuscripcion.create({
+          data: {
+            suscripcionId: suscripcion.id,
+            accion: 'ACTIVACION_CODIGO',
+            descripcion: `Período de prueba de 14 días activado automáticamente. Vence el ${fechaVencimiento.toLocaleDateString('es-ES', { 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })}`,
+            codigoUsado: codigoPrueba.codigo,
+            realizadoPor: usuario.id,
+            metadata: {
+              tipoActivacion: 'automatica',
+              duracionDias: 30,
+              emailUsuario: dto.email,
+              fechaInicio: fechaActivacion.toISOString(),
+              fechaFin: fechaVencimiento.toISOString(),
+            },
+          },
+        });
+
+        // 7. NO cambiar primerLogin aquí - se cambiará cuando complete el onboarding
+        // El usuario tiene suscripción activa pero aún debe configurar su negocio
+        
+        return { usuario, negocioId: negocio.id };
       });
 
-      // Crear negocio asociado con todos los datos
-      await this.negocioRepository.create({
-        nombre: dto.nombre.trim(),
-        telefono: dto.telefono.trim(),
-        logo: dto.logo,
-        descripcion: dto.descripcion?.trim(),
-        usuarioId: usuario.id,
-      });
-
-      // Obtener usuario completo con negocio
-      const usuarioCompleto = await this.usuarioRepository.findById(usuario.id);
-
-      if (!usuarioCompleto) {
-        throw new Error('Error al obtener usuario creado');
+      // Crear el registro de UsoRecursos para el primer ciclo
+      // Esto asegura que el dashboard pueda cargar los datos de uso desde el primer día
+      try {
+        await usoRecursosService.obtenerUsoActual(resultado.negocioId);
+      } catch (error) {
+        console.warn('No se pudo crear el registro de UsoRecursos inicial:', error);
+        // No lanzar error, solo advertir - el registro se creará al primer uso
       }
 
-      if (!usuarioCompleto.negocio) {
-        throw new Error('Error al crear negocio asociado');
+      // Obtener el usuario completo con toda la información
+      const usuarioCompleto = await this.usuarioRepository.findById(resultado.usuario.id);
+
+      if (!usuarioCompleto || !usuarioCompleto.negocio) {
+        throw new Error('Error al crear usuario y negocio');
       }
 
       return this.toResponse(usuarioCompleto);
     } catch (error: any) {
-      // Si falla la creación del negocio, el usuario quedará inconsistente
-      // En producción, usar una transacción de Prisma
       console.error('Error al registrar usuario:', error);
       throw new Error(error.message || 'Error al registrar usuario y negocio');
     }
   }
 
-  /**
-   * Login de usuario
-   */
-  async login(dto: LoginUsuarioDto): Promise<LoginUsuarioResponse> {
-    // Buscar usuario por email
-    const usuario = await this.usuarioRepository.findByEmail(dto.email);
-
-    if (!usuario) {
-      throw new Error('Credenciales inválidas');
-    }
-
-    // Verificar que esté activo
-    if (!usuario.activo) {
-      throw new Error('Usuario inactivo. Contacte al administrador.');
-    }
-
-    // Verificar contraseña
-    const isPasswordValid = await comparePassword(dto.password, usuario.password);
-
-    if (!isPasswordValid) {
-      throw new Error('Credenciales inválidas');
-    }
-
-    // Generar token
-    const token = generateToken({
-      id: usuario.id,
-      email: usuario.email,
-      rol: usuario.rol,
-    });
-
-    // Verificar si requiere código de activación
-    const requiereCodigoActivacion =
-      usuario.primerLogin && 
-      usuario.negocio?.estadoSuscripcion === 'SIN_SUSCRIPCION';
-
-    return {
-      token,
-      user: this.toResponse(usuario),
-      requiereCodigoActivacion,
-    };
-  }
-
-  /**
-   * Obtener usuario por ID
-   */
-  async getById(id: string): Promise<UsuarioResponse> {
-    const usuario = await this.usuarioRepository.findById(id);
+  async getProfile(userId: string): Promise<UsuarioResponse> {
+    const usuario = await this.usuarioRepository.findById(userId);
 
     if (!usuario) {
       throw new Error('Usuario no encontrado');
@@ -144,24 +197,19 @@ export class UsuarioService {
     return this.toResponse(usuario);
   }
 
-  /**
-   * Actualizar usuario
-   */
-  async update(id: string, dto: UpdateUsuarioDto): Promise<UsuarioResponse> {
-    const usuario = await this.usuarioRepository.findById(id);
+  async updateProfile(userId: string, dto: UpdateUsuarioDto): Promise<UsuarioResponse> {
+    const usuario = await this.usuarioRepository.findById(userId);
 
     if (!usuario) {
       throw new Error('Usuario no encontrado');
     }
 
-    // Si se actualiza el email, verificar que no exista
     if (dto.email && dto.email !== usuario.email) {
       const emailExists = await this.usuarioRepository.emailExists(dto.email);
       if (emailExists) {
         throw new Error('El email ya está registrado');
       }
 
-      // Validar email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(dto.email)) {
         throw new Error('Email inválido');
@@ -170,11 +218,14 @@ export class UsuarioService {
 
     const updateData: any = {};
 
+    if (dto.nombre) {
+      updateData.nombre = dto.nombre;
+    }
+
     if (dto.email) {
       updateData.email = dto.email;
     }
 
-    // Si se actualiza la contraseña, hashearla
     if (dto.password) {
       if (dto.password.length < 6) {
         throw new Error('La contraseña debe tener al menos 6 caracteres');
@@ -182,21 +233,18 @@ export class UsuarioService {
       updateData.password = await hashPassword(dto.password);
     }
 
-    // Actualizar usuario
-    await this.usuarioRepository.update(id, updateData);
+    await this.usuarioRepository.update(userId, updateData);
 
-    // Si se actualizó nombre o teléfono, actualizar negocio
-    if (dto.nombre || dto.telefono) {
+    if (dto.nombreNegocio || dto.telefono) {
       if (usuario.negocio) {
         await this.negocioRepository.update(usuario.negocio.id, {
-          nombre: dto.nombre,
+          nombre: dto.nombreNegocio,
           telefono: dto.telefono,
         });
       }
     }
 
-    // Obtener usuario actualizado completo
-    const usuarioCompleto = await this.usuarioRepository.findById(id);
+    const usuarioCompleto = await this.usuarioRepository.findById(userId);
 
     if (!usuarioCompleto) {
       throw new Error('Error al actualizar usuario');
@@ -206,39 +254,139 @@ export class UsuarioService {
   }
 
   /**
-   * Eliminar usuario
+   * Actualizar datos personales del usuario
    */
-  async delete(id: string): Promise<void> {
-    const usuario = await this.usuarioRepository.findById(id);
+  async actualizarPerfil(
+    usuarioId: string,
+    datos: { nombre?: string; email?: string }
+  ): Promise<{ success: boolean; data: any; message: string }> {
+    try {
+      // Validar que al menos un campo esté presente
+      if (!datos.nombre && !datos.email) {
+        throw new Error('Debe proporcionar al menos un campo para actualizar');
+      }
 
-    if (!usuario) {
-      throw new Error('Usuario no encontrado');
+      // Preparar datos de actualización
+      const datosActualizar: any = {};
+      
+      if (datos.nombre) {
+        datosActualizar.nombre = datos.nombre.trim();
+      }
+
+      if (datos.email) {
+        const emailTrim = datos.email.trim().toLowerCase();
+        
+        // Verificar que el email no esté en uso por otro usuario
+        const emailExistente = await this.prisma.usuario.findFirst({
+          where: {
+            email: emailTrim,
+            NOT: {
+              id: usuarioId
+            }
+          }
+        });
+
+        if (emailExistente) {
+          throw new Error('El correo electrónico ya está en uso');
+        }
+
+        datosActualizar.email = emailTrim;
+      }
+
+      // Actualizar usuario
+      const usuarioActualizado = await this.prisma.usuario.update({
+        where: { id: usuarioId },
+        data: datosActualizar,
+        include: {
+          negocio: {
+            select: {
+              id: true,
+              nombre: true,
+              logo: true,
+              descripcion: true,
+              telefono: true,
+              estadoSuscripcion: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        data: this.toResponse(usuarioActualizado),
+        message: 'Perfil actualizado correctamente',
+      };
+    } catch (error: any) {
+      console.error('Error actualizando perfil:', error);
+      throw error;
     }
-
-    // El negocio se eliminará en cascada
-    await this.usuarioRepository.delete(id);
   }
 
   /**
-   * Obtener perfil del usuario autenticado
+   * Cambiar contraseña del usuario
    */
-  async getProfile(userId: string): Promise<UsuarioResponse> {
-    return this.getById(userId);
+  async cambiarPassword(
+    usuarioId: string,
+    passwordActual: string,
+    passwordNueva: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Obtener usuario con contraseña
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: {
+          id: true,
+          password: true,
+          nombre: true,
+          email: true,
+        },
+      });
+
+      if (!usuario) {
+        throw new Error('Usuario no encontrado');
+      }
+
+      // Verificar contraseña actual
+      const esPasswordValida = await comparePassword(passwordActual, usuario.password);
+      
+      if (!esPasswordValida) {
+        throw new Error('La contraseña actual es incorrecta');
+      }
+
+      // Validar que la nueva contraseña sea diferente
+      const esIgualAnterior = await comparePassword(passwordNueva, usuario.password);
+      if (esIgualAnterior) {
+        throw new Error('La nueva contraseña debe ser diferente a la actual');
+      }
+
+      // Validar requisitos de la nueva contraseña
+      if (passwordNueva.length < 8) {
+        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
+      }
+
+      // Hashear nueva contraseña
+      const hashedPassword = await hashPassword(passwordNueva);
+
+      // Actualizar contraseña
+      await this.prisma.usuario.update({
+        where: { id: usuarioId },
+        data: { password: hashedPassword },
+      });
+
+      return {
+        success: true,
+        message: 'Contraseña actualizada correctamente',
+      };
+    } catch (error: any) {
+      console.error('Error cambiando contraseña:', error);
+      throw error;
+    }
   }
 
-  /**
-   * Actualizar perfil del usuario autenticado
-   */
-  async updateProfile(userId: string, dto: UpdateUsuarioDto): Promise<UsuarioResponse> {
-    return this.update(userId, dto);
-  }
-
-  /**
-   * Convertir a DTO de respuesta
-   */
   private toResponse(usuario: any): UsuarioResponse {
     return {
       id: usuario.id,
+      nombre: usuario.nombre,
       email: usuario.email,
       rol: usuario.rol,
       primerLogin: usuario.primerLogin,
@@ -251,6 +399,9 @@ export class UsuarioService {
             logo: usuario.negocio.logo,
             descripcion: usuario.negocio.descripcion,
             estadoSuscripcion: usuario.negocio.estadoSuscripcion,
+            // 🎯 Plan pendiente (sistema de cola)
+            planPendiente: usuario.negocio.suscripcion?.planPendiente || null,
+            fechaInicioPendiente: usuario.negocio.suscripcion?.fechaInicioPendiente || null,
           }
         : undefined,
       createdAt: usuario.createdAt,

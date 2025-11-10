@@ -1,12 +1,11 @@
 // prisma/schema.prisma
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearch", "fullTextIndex"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "cockroachdb"
   url      = env("DATABASE_URL")
 }
 
@@ -30,18 +29,38 @@ model SuperAdmin {
 
 model Usuario {
   id          String     @id @default(uuid())
+  nombre      String
   email       String     @unique
   password    String
   rol         RolUsuario @default(ADMIN_NEGOCIO)
   primerLogin Boolean    @default(true)
   activo      Boolean    @default(true)
   negocio     Negocio?
+  
+  // Relación con tokens de recuperación de contraseña
+  passwordResetTokens PasswordResetToken[]
+  
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
   @@index([email])
   @@index([rol])
   @@index([activo])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique // Token único para recuperación
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId String
+  expiresAt DateTime // Fecha de expiración del token (ej: 1 hora)
+  usado     Boolean  @default(false) // Si el token ya fue usado
+  createdAt DateTime @default(now())
+  
+  @@index([token])
+  @@index([usuarioId])
+  @@index([expiresAt])
+  @@index([usado])
 }
 
 enum RolUsuario {
@@ -54,14 +73,16 @@ enum RolUsuario {
 // ============================================================================
 
 model Negocio {
-  id                String            @id @default(uuid())
-  nombre            String
-  telefono          String
-  logo              String?
-  descripcion       String?
-  usuario           Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  usuarioId         String            @unique
-  
+  id          String  @id @default(uuid())
+  nombre      String
+  telefono    String
+  logo        String?
+  descripcion String?
+  direccion   String? // Dirección del negocio
+  googleMapsUrl String? // URL de Google Maps para ubicación
+  usuario     Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId   String  @unique
+
   // SUSCRIPCIÓN
   suscripcion       Suscripcion?
   estadoSuscripcion EstadoSuscripcion @default(SIN_SUSCRIPCION)
@@ -69,27 +90,58 @@ model Negocio {
   bloqueado         Boolean           @default(false)
   motivoBloqueo     String?
   codigoAplicado    Boolean           @default(false) // Si ya aplicó un código
+
+  // AGENDA PÚBLICA
+  linkPublico           String?  @unique // Link único para agenda pública (ej: "salon-maria-abc123")
+  agendaPublica         Boolean  @default(true) // Habilitar/deshabilitar agenda pública
+  mostrarPreciosPublico Boolean  @default(true) // Mostrar precios en agenda pública
+
+  // LÍMITES DEL PLAN (null = ilimitado)
+  limiteSucursales  Int? // 1 (GRATIS), 5 (PRO), null (PRO PLUS = ilimitado)
+  limiteEmpleados   Int? // 3 (GRATIS), 10 (PRO), null (PRO PLUS = ilimitado)
+  limiteServicios   Int? // 5 (GRATIS), 25 (PRO), null (PRO PLUS = ilimitado)
+  limiteClientes    Int? // 50 (GRATIS), 500 (PRO), null (PRO PLUS = ilimitado)
+  limiteCitasMes    Int? // 50 (GRATIS), null (PRO y PRO PLUS = ilimitado)
+  limiteWhatsAppMes Int? // null (GRATIS = sin WhatsApp), 300 (PRO), null (PRO PLUS = ilimitado)
+  limiteEmailMes    Int? // 50 (GRATIS), 300 (PRO), null (PRO PLUS = ilimitado)
+
+  // CARACTERÍSTICAS HABILITADAS POR PLAN
+  reportesAvanzados Boolean @default(false) // Solo PRO PLUS
+
+  // NOTIFICACIONES Y RECORDATORIOS
+  notificacionesWhatsApp Boolean @default(true)
+  notificacionesEmail    Boolean @default(true)
+  recordatoriosAutomaticos Boolean @default(true) // Habilitar/deshabilitar recordatorios automáticos
   
-  // CONFIGURACIONES DEL NEGOCIO
-  zonaHoraria       String            @default("America/Guayaquil")
-  moneda            String            @default("USD")
-  idioma            String            @default("es")
+  // Recordatorios configurables (en minutos antes de la cita, null = deshabilitado)
+  recordatorio1 Int? @default(1440) // Por defecto 24 horas (1440 minutos) - Todos los planes
+  recordatorio2 Int? // Recordatorio adicional - Todos los planes
+  recordatorio3 Int? // Recordatorio adicional - Solo PRO PLUS
+  recordatorio4 Int? // Recordatorio adicional - Solo PRO PLUS
+  recordatorio5 Int? // Recordatorio adicional - Solo PRO PLUS
   
-  // NOTIFICACIONES
-  notificacionesWhatsApp Boolean       @default(true)
-  notificacionesEmail    Boolean       @default(true)
-  recordatorio24h        Boolean       @default(true)
-  recordatorio1h         Boolean       @default(false)
-  
+  // Mensajes personalizables para WhatsApp
+  mensajeRecordatorio   String? @default("Hola {cliente}, tu cita ha sido confirmada para el {fecha} a las {hora} en {negocio}. ¡Te esperamos!")
+  mensajeReagendamiento String? @default("Hola {cliente}, te recordamos tu cita el {fecha} a las {hora} en {negocio}. No faltes!")
+
+  // WHATSAPP CONFIGURATION (Evolution API)
+  whatsappInstanceId    String?   // ID de la instancia en Evolution (ej: "negocio_abc123")
+  whatsappConnected     Boolean   @default(false) // Estado de conexión
+  whatsappPhoneNumber   String?   // Número vinculado (ej: "593991234567")
+  whatsappQrCode        String?   // QR Code base64 (temporal)
+  whatsappConfiguredAt  DateTime? // Fecha de última configuración
+
   // RELACIONES
-  sucursales        Sucursal[]
-  servicios         Servicio[]
-  empleados         Empleado[]
-  clientes          Cliente[]
-  citas             Cita[]
-  
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  sucursales      Sucursal[]
+  servicios       Servicio[]
+  empleados       Empleado[]
+  clientes        Cliente[]
+  citas           Cita[]
+  usoRecursos     UsoRecursos[]
+  registrosEnvios RegistroEnvio[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([usuarioId])
   @@index([estadoSuscripcion])
@@ -98,58 +150,67 @@ model Negocio {
 }
 
 model Suscripcion {
-  id                String                   @id @default(uuid())
-  negocio           Negocio                  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId         String                   @unique
-  
+  id        String  @id @default(uuid())
+  negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String  @unique
+
   // Código de suscripción usado
-  codigoSuscripcion CodigoSuscripcion        @relation(fields: [codigoId], references: [id])
+  codigoSuscripcion CodigoSuscripcion @relation(fields: [codigoId], references: [id])
   codigoId          String
-  
-  fechaActivacion   DateTime                 @default(now())
-  fechaVencimiento  DateTime
-  
-  activa            Boolean                  @default(true)
-  renovacionAuto    Boolean                  @default(false)
-  
+
+  fechaActivacion  DateTime @default(now())
+  fechaVencimiento DateTime
+
+  activa         Boolean @default(true)
+  renovacionAuto Boolean @default(false)
+
+  // Plan pendiente (sistema de cola)
+  planPendiente         String?   // Plan que se activará cuando venza el actual
+  codigoPendienteId     String?   // Código del plan pendiente
+  codigoPendiente       CodigoSuscripcion? @relation("CodigoPendiente", fields: [codigoPendienteId], references: [id])
+  fechaInicioPendiente  DateTime? // Fecha en que se activará el plan pendiente
+
   // Historial
-  historial         HistorialSuscripcion[]
-  
-  createdAt         DateTime                 @default(now())
-  updatedAt         DateTime                 @updatedAt
+  historial HistorialSuscripcion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([negocioId])
   @@index([codigoId])
   @@index([fechaVencimiento])
   @@index([activa])
+  @@index([planPendiente])
+  @@index([fechaInicioPendiente])
 }
 
 model CodigoSuscripcion {
-  id                String           @id @default(uuid())
-  codigo            String           @unique // "MEN-2024-ABC123"
-  
+  id     String @id @default(uuid())
+  codigo String @unique // "MEN-2024-ABC123"
+
   // Configuración del plan
-  plan              PlanSuscripcion  @default(MENSUAL)
-  duracionMeses     Int              // 1, 3, 6, 12, etc.
-  descripcion       String?
-  precio            Decimal?         @db.Decimal(10, 2) // Para referencia
-  
+  plan          PlanSuscripcion @default(GRATIS)
+  duracionDias  Int // 14 (GRATIS), 30 (MENSUAL), 365 (ANUAL)
+  descripcion   String?
+  precio        Decimal?        @db.Decimal(10, 2) // 0 (GRATIS), 10 (PRO_MENSUAL), 9 (PRO_ANUAL), 20 (PRO_PLUS_MENSUAL), 17 (PRO_PLUS_ANUAL)
+
   // Control de uso
-  usado             Boolean          @default(false)
-  fechaUso          DateTime?
-  fechaExpiracion   DateTime?        // El código expira en esta fecha
-  usoMaximo         Int              @default(1)
-  vecesUsado        Int              @default(0)
-  
+  usado           Boolean   @default(false)
+  fechaUso        DateTime?
+  fechaExpiracion DateTime? // El código expira en esta fecha
+  usoMaximo       Int       @default(1)
+  vecesUsado      Int       @default(0)
+
   // Auditoría
-  motivoCreacion    String?
-  notas             String?
-  
+  motivoCreacion String?
+  notas          String?
+
   // Relaciones
-  suscripciones     Suscripcion[]
-  
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  suscripciones           Suscripcion[]
+  suscripcionesPendientes Suscripcion[] @relation("CodigoPendiente")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([codigo])
   @@index([usado])
@@ -158,17 +219,17 @@ model CodigoSuscripcion {
 }
 
 model HistorialSuscripcion {
-  id              String            @id @default(uuid())
-  suscripcion     Suscripcion       @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
-  suscripcionId   String
-  
-  accion          AccionSuscripcion
-  descripcion     String
-  codigoUsado     String?
-  realizadoPor    String?           // ID de quien hizo la acción
-  metadata        Json?             // Datos adicionales en formato JSON
-  
-  createdAt       DateTime          @default(now())
+  id            String      @id @default(uuid())
+  suscripcion   Suscripcion @relation(fields: [suscripcionId], references: [id], onDelete: Cascade)
+  suscripcionId String
+
+  accion       AccionSuscripcion
+  descripcion  String
+  codigoUsado  String?
+  realizadoPor String? // ID de quien hizo la acción
+  metadata     Json? // Datos adicionales en formato JSON
+
+  createdAt DateTime @default(now())
 
   @@index([suscripcionId])
   @@index([accion])
@@ -176,20 +237,20 @@ model HistorialSuscripcion {
 }
 
 enum EstadoSuscripcion {
-  SIN_SUSCRIPCION  // Registrado pero sin código aplicado
-  ACTIVA           // Con suscripción activa (código aplicado y vigente)
-  VENCIDA          // Suscripción expiró
-  BLOQUEADA        // Bloqueado por super admin
-  CANCELADA        // Usuario canceló
+  SIN_SUSCRIPCION // Registrado pero sin código aplicado
+  ACTIVA // Con suscripción activa (código aplicado y vigente)
+  VENCIDA // Suscripción expiró
+  BLOQUEADA // Bloqueado por super admin
+  CANCELADA // Usuario canceló
 }
 
 enum PlanSuscripcion {
-  PRUEBA         // 7 días de prueba
-  MENSUAL        // 1 mes
-  TRIMESTRAL     // 3 meses
-  SEMESTRAL      // 6 meses
-  ANUAL          // 12 meses
-  PERSONALIZADO  // X meses custom
+  GRATIS          // 14 días de prueba - $0
+  PRO_MENSUAL     // Plan PRO facturado mensualmente - $10/mes
+  PRO_ANUAL       // Plan PRO facturado anualmente - $9/mes ($108/año)
+  PRO_PLUS_MENSUAL // Plan PRO PLUS facturado mensualmente - $20/mes
+  PRO_PLUS_ANUAL   // Plan PRO PLUS facturado anualmente - $17/mes ($204/año)
+  PERSONALIZADO    // Para casos especiales
 }
 
 enum AccionSuscripcion {
@@ -201,6 +262,8 @@ enum AccionSuscripcion {
   DESBLOQUEO
   CANCELACION
   CAMBIO_PLAN
+  PLAN_EN_COLA                    // Plan guardado para activación futura
+  PLAN_ACTIVADO_AUTOMATICAMENTE   // Plan pendiente activado al vencer el anterior
 }
 
 // ============================================================================
@@ -208,24 +271,27 @@ enum AccionSuscripcion {
 // ============================================================================
 
 model Cliente {
-  id          String   @id @default(uuid())
-  nombre      String
-  telefono    String
-  email       String?
-  notas       String?  @db.Text
-  
+  id       String  @id @default(uuid())
+  nombre   String
+  cedula   String
+  telefono String
+  email    String?
+  notas    String?
+
   // Relación con negocio
-  negocio     Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId   String
-  
+  negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
   // Relaciones
-  citas       Cita[]
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  citas Cita[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([negocioId, telefono]) // Un teléfono único por negocio
+  @@unique([negocioId, cedula]) // Una cédula única por negocio
   @@index([negocioId])
+  @@index([cedula])
   @@index([telefono])
   @@index([email])
   @@index([nombre])
@@ -236,27 +302,26 @@ model Cliente {
 // ============================================================================
 
 model Empleado {
-  id          String               @id @default(uuid())
-  nombre      String
-  cargo       String
-  telefono    String
-  email       String
-  foto        String?
-  color       String               @default("#3b82f6") // Color para el calendario
-  estado      EstadoEmpleado       @default(ACTIVO)
-  
+  id       String         @id @default(uuid())
+  nombre   String
+  cargo    String
+  telefono String
+  email    String
+  foto     String?
+  estado   EstadoEmpleado @default(ACTIVO)
+
   // Relación con negocio
-  negocio     Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId   String
-  
+  negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
   // Relaciones
-  sucursales  EmpleadoSucursal[]
-  horarios    HorarioEmpleado[]
-  bloqueos    BloqueoEmpleado[]
-  citas       Cita[]
-  
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  sucursales EmpleadoSucursal[]
+  horarios   HorarioEmpleado[]
+  bloqueos   BloqueoEmpleado[]
+  citas      Cita[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([negocioId])
   @@index([estado])
@@ -264,18 +329,18 @@ model Empleado {
 }
 
 model HorarioEmpleado {
-  id          String   @id @default(uuid())
-  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empleadoId  String
-  
-  diaSemana   Int      // 0=Domingo, 1=Lunes, 2=Martes, ..., 6=Sábado
-  horaInicio  String   // "09:00"
-  horaFin     String   // "18:00"
-  
+  id         String   @id @default(uuid())
+  empleado   Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleadoId String
+
+  diaSemana  Int // 0=Domingo, 1=Lunes, 2=Martes, ..., 6=Sábado
+  horaInicio String // "09:00"
+  horaFin    String // "18:00"
+
   // Descansos (opcional)
-  tieneDescanso     Boolean @default(false)
-  descansoInicio    String? // "13:00"
-  descansoFin       String? // "14:00"
+  tieneDescanso  Boolean @default(false)
+  descansoInicio String? // "13:00"
+  descansoFin    String? // "14:00"
 
   @@unique([empleadoId, diaSemana])
   @@index([empleadoId])
@@ -283,20 +348,20 @@ model HorarioEmpleado {
 }
 
 model BloqueoEmpleado {
-  id          String   @id @default(uuid())
-  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empleadoId  String
-  
+  id         String   @id @default(uuid())
+  empleado   Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleadoId String
+
   fechaInicio DateTime
   fechaFin    DateTime
   motivo      String?
   todoElDia   Boolean  @default(true)
-  
+
   // Si no es todo el día
-  horaInicio  String?  // "10:00"
-  horaFin     String?  // "12:00"
-  
-  createdAt   DateTime @default(now())
+  horaInicio String? // "10:00"
+  horaFin    String? // "12:00"
+
+  createdAt DateTime @default(now())
 
   @@index([empleadoId])
   @@index([fechaInicio, fechaFin])
@@ -312,38 +377,31 @@ enum EstadoEmpleado {
 // ============================================================================
 
 model Sucursal {
-  id          String               @id @default(uuid())
-  nombre      String
-  direccion   String
-  ciudad      String
-  provincia   String
-  telefono    String
-  email       String
-  
-  // Coordenadas GPS
-  latitud     Float?
-  longitud    Float?
-  linkMaps    String?              // Generado automáticamente
-  
-  estado      EstadoSucursal       @default(ACTIVA)
-  
-  // Fotos
-  fotos       FotoSucursal[]
-  
+  id            String  @id @default(uuid())
+  nombre        String
+  direccion     String
+  ciudad        String?
+  provincia     String?
+  telefono      String
+  email         String?
+  googleMapsUrl String? // URL de Google Maps para ubicación
+
+  estado EstadoSucursal @default(ACTIVA)
+
   // Horario general de atención
-  horarios    HorarioSucursal[]
-  
+  horarios HorarioSucursal[]
+
   // Relación con negocio
-  negocio     Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId   String
-  
+  negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
   // Relaciones
-  empleados   EmpleadoSucursal[]
-  servicios   ServicioSucursal[]
-  citas       Cita[]
-  
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  empleados EmpleadoSucursal[]
+  servicios ServicioSucursal[]
+  citas     Cita[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([negocioId])
   @@index([estado])
@@ -351,31 +409,22 @@ model Sucursal {
 }
 
 model HorarioSucursal {
-  id          String   @id @default(uuid())
-  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  sucursalId  String
-  
-  diaSemana   Int      // 0=Domingo, 1=Lunes, ..., 6=Sábado
-  abierto     Boolean  @default(true)
+  id         String   @id @default(uuid())
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId String
+
+  diaSemana    Int     // 0=Domingo, 1=Lunes, ..., 6=Sábado
+  abierto      Boolean @default(true)
   horaApertura String? // "08:00"
   horaCierre   String? // "20:00"
 
+  // Descanso/Almuerzo (opcional)
+  tieneDescanso  Boolean @default(false)
+  descansoInicio String? // "13:00"
+  descansoFin    String? // "14:00"
+
   @@unique([sucursalId, diaSemana])
   @@index([sucursalId])
-}
-
-model FotoSucursal {
-  id          String   @id @default(uuid())
-  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  sucursalId  String
-  
-  url         String
-  orden       Int      @default(0)
-  
-  createdAt   DateTime @default(now())
-
-  @@index([sucursalId])
-  @@index([orden])
 }
 
 enum EstadoSucursal {
@@ -388,45 +437,29 @@ enum EstadoSucursal {
 // ============================================================================
 
 model Servicio {
-  id          String               @id @default(uuid())
+  id          String         @id @default(uuid())
   nombre      String
-  descripcion String               @db.Text
-  duracion    Int                  // Duración en minutos
-  precio      Decimal              @db.Decimal(10, 2)
+  descripcion String
+  duracion    Int // Duración en minutos
+  precio      Decimal        @db.Decimal(10, 2)
   foto        String?
-  estado      EstadoServicio       @default(ACTIVO)
-  
+  color       String         @default("#3b82f6") // Color para el calendario
+  estado      EstadoServicio @default(ACTIVO)
+
   // Relación con negocio
-  negocio     Negocio              @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId   String
-  
+  negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
   // Relaciones
-  extras      ServicioExtra[]
-  sucursales  ServicioSucursal[]
-  citas       Cita[]
-  
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  sucursales ServicioSucursal[]
+  citas      Cita[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([negocioId])
   @@index([estado])
   @@index([nombre])
-}
-
-model ServicioExtra {
-  id          String   @id @default(uuid())
-  servicio    Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-  servicioId  String
-  
-  nombre      String
-  precio      Decimal  @db.Decimal(10, 2)
-  estado      Boolean  @default(true)
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([servicioId])
-  @@index([estado])
 }
 
 enum EstadoServicio {
@@ -439,46 +472,47 @@ enum EstadoServicio {
 // ============================================================================
 
 model Cita {
-  id            String       @id @default(uuid())
-  
+  id String @id @default(uuid())
+
   // Información básica
-  fecha         DateTime     @db.Date
-  horaInicio    DateTime     @db.Time
-  horaFin       DateTime     @db.Time
-  
-  estado        EstadoCita   @default(PENDIENTE)
-  notas         String?      @db.Text
-  precioTotal   Decimal      @db.Decimal(10, 2)
-  canalOrigen   CanalOrigen  @default(MANUAL)
-  
+  fecha      DateTime @db.Date // Solo fecha (YYYY-MM-DD) sin hora
+  horaInicio String   // Hora en formato "HH:mm" ("09:00")
+  horaFin    String   // Hora en formato "HH:mm" ("10:00")
+
+  estado      EstadoCita  @default(PENDIENTE)
+  notas       String?
+  precioTotal Decimal     @db.Decimal(10, 2)
+  canalOrigen CanalOrigen @default(MANUAL)
+
   // Relaciones
-  cliente       Cliente      @relation(fields: [clienteId], references: [id], onDelete: Restrict)
-  clienteId     String
-  
-  servicio      Servicio     @relation(fields: [servicioId], references: [id], onDelete: Restrict)
-  servicioId    String
-  
-  empleado      Empleado     @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
-  empleadoId    String
-  
-  sucursal      Sucursal     @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
-  sucursalId    String
-  
-  negocio       Negocio      @relation(fields: [negocioId], references: [id], onDelete: Cascade)
-  negocioId     String
-  
-  // Extras seleccionados (JSON array)
-  extrasSeleccionados Json?  // [{ id: "uuid", nombre: "Extra", precio: 10 }]
-  
-  // Notificaciones
-  notificaciones NotificacionCita[]
-  
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  clienteId String
+
+  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  servicioId String
+
+  empleado   Empleado? @relation(fields: [empleadoId], references: [id], onDelete: Restrict)
+  empleadoId String? // Opcional: algunos negocios no tienen empleados
+
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Restrict)
+  sucursalId String
+
+  negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
+  // Relación con envíos
+  registrosEnvios RegistroEnvio[]
+
+  // Recordatorios automáticos
+  recordatorioEnviado   Boolean   @default(false) // Si ya se envió el recordatorio
+  recordatorioEnviadoEn DateTime? // Fecha/hora en que se envió el recordatorio
+
   // Auditoría
-  creadoPor     String?      // ID del usuario que creó la cita
-  modificadoPor String?      // ID del usuario que modificó
-  
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  creadoPor     String? // ID del usuario que creó la cita
+  modificadoPor String? // ID del usuario que modificó
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([negocioId])
   @@index([fecha])
@@ -488,31 +522,6 @@ model Cita {
   @@index([clienteId])
   @@index([servicioId])
   @@index([canalOrigen])
-}
-
-model NotificacionCita {
-  id          String              @id @default(uuid())
-  cita        Cita                @relation(fields: [citaId], references: [id], onDelete: Cascade)
-  citaId      String
-  
-  tipo        TipoNotificacion
-  canal       CanalNotificacion
-  
-  destinatario String             // Email o teléfono
-  mensaje      String             @db.Text
-  
-  estado      EstadoNotificacion  @default(PENDIENTE)
-  intentos    Int                 @default(0)
-  
-  fechaEnvio  DateTime?
-  error       String?             @db.Text
-  
-  createdAt   DateTime            @default(now())
-
-  @@index([citaId])
-  @@index([estado])
-  @@index([tipo])
-  @@index([fechaEnvio])
 }
 
 enum EstadoCita {
@@ -527,27 +536,7 @@ enum CanalOrigen {
   MANUAL
   WEB
   WHATSAPP
-}
-
-enum TipoNotificacion {
-  CONFIRMACION
-  RECORDATORIO_24H
-  RECORDATORIO_1H
-  CANCELACION
-  REAGENDAMIENTO
-}
-
-enum CanalNotificacion {
-  WHATSAPP
-  EMAIL
-  SMS
-}
-
-enum EstadoNotificacion {
-  PENDIENTE
-  ENVIADO
-  FALLIDO
-  CANCELADO
+  WEB_PUBLICA // Citas creadas desde la agenda pública
 }
 
 // ============================================================================
@@ -555,12 +544,12 @@ enum EstadoNotificacion {
 // ============================================================================
 
 model EmpleadoSucursal {
-  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
-  empleadoId  String
-  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  sucursalId  String
-  
-  asignadoEn  DateTime @default(now())
+  empleado   Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  empleadoId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId String
+
+  asignadoEn DateTime @default(now())
 
   @@id([empleadoId, sucursalId])
   @@index([empleadoId])
@@ -568,13 +557,13 @@ model EmpleadoSucursal {
 }
 
 model ServicioSucursal {
-  servicio    Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
-  servicioId  String
-  sucursal    Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
-  sucursalId  String
-  
-  disponible  Boolean  @default(true)
-  asignadoEn  DateTime @default(now())
+  servicio   Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  servicioId String
+  sucursal   Sucursal @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  sucursalId String
+
+  disponible Boolean  @default(true)
+  asignadoEn DateTime @default(now())
 
   @@id([servicioId, sucursalId])
   @@index([servicioId])
@@ -583,24 +572,105 @@ model ServicioSucursal {
 }
 
 // ============================================================================
+// SEGUIMIENTO DE USO DE RECURSOS (Control de Límites)
+// ============================================================================
+
+model UsoRecursos {
+  id        String   @id @default(uuid())
+  negocio   Negocio  @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  negocioId String
+
+  cicloInicio DateTime // Fecha de inicio del ciclo de facturación
+  cicloFin    DateTime // Fecha de fin del ciclo de facturación
+
+  // Contadores del ciclo actual
+  citasCreadas     Int @default(0)
+  whatsappEnviados Int @default(0)
+  emailsEnviados   Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([negocioId, cicloInicio])
+  @@index([negocioId, cicloInicio, cicloFin])
+}
+
+// ============================================================================
+// CONFIGURACIÓN DE PLANES (Configurable por Super Admin)
+// ============================================================================
+
+model ConfiguracionPlanes {
+  id   String          @id @default(uuid())
+  plan PlanSuscripcion @unique
+
+  // Límites del plan (null = ilimitado)
+  limiteSucursales  Int?
+  limiteEmpleados   Int?
+  limiteServicios   Int?
+  limiteClientes    Int?
+  limiteCitasMes    Int?
+  limiteWhatsAppMes Int?
+  limiteEmailMes    Int?
+
+  // Características
+  reportesAvanzados Boolean @default(false)
+
+  // Duración y precio
+  duracionDias Int // 14, 30, 365
+  precio       Decimal @db.Decimal(10, 2)
+
+  // Información adicional
+  nombre      String
+  descripcion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([plan])
+}
+
+// ============================================================================
+// REGISTRO DE ENVÍOS (Email y WhatsApp)
+// ============================================================================
+
+model RegistroEnvio {
+  id         String      @id @default(uuid())
+  negocioId  String
+  tipo       TipoEnvio   // EMAIL o WHATSAPP
+  destinatario String    // Email o teléfono
+  asunto     String?     // Para emails
+  exitoso    Boolean     @default(true)
+  error      String?     // Si hubo error
+  citaId     String?     // Opcional: si está relacionado con una cita
+  createdAt  DateTime    @default(now())
+
+  negocio Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
+  cita    Cita?   @relation(fields: [citaId], references: [id], onDelete: SetNull)
+
+  @@index([negocioId])
+  @@index([tipo])
+  @@index([createdAt])
+  @@index([citaId])
+}
+
+enum TipoEnvio {
+  EMAIL
+  WHATSAPP
+}
+
+// ============================================================================
 // CONFIGURACIONES GLOBALES (Super Admin)
 // ============================================================================
 
 model ConfiguracionGlobal {
-  id          String   @id @default(uuid())
-  clave       String   @unique
-  valor       String   @db.Text
-  tipo        String   // STRING, NUMBER, BOOLEAN, JSON
+  id          String  @id @default(uuid())
+  clave       String  @unique
+  valor       String
+  tipo        String // STRING, NUMBER, BOOLEAN, JSON
   descripcion String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([clave])
 }
-
-// Ejemplo de configuraciones:
-// - DURACION_PRUEBA_GRATIS: "7"
-// - EMAIL_NOTIFICACIONES: "admin@tusaas.com"
-// - MANTENIMIENTO_ACTIVO: "false"
-// - PLANES_DISPONIBLES: '["MENSUAL","TRIMESTRAL","ANUAL"]'

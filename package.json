@@ -10,7 +10,24 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx prisma/seed.ts",
+    "test": "tsx src/tests/cita.service.test.ts",
+    "test:watch": "tsx watch src/tests/cita.service.test.ts",
+    "test:planes": "tsx src/tests/planes-system.test.ts",
+    "test:cola": "tsx src/tests/suscripcion-cola.test.ts",
+    "test:uso-recursos": "tsx src/tests/uso-recursos.test.ts",
+    "test:suscripcion-fechas": "tsx src/tests/suscripcion-fechas.test.ts",
+    "test:recordatorios": "tsx src/tests/test-recordatorios.ts",
+    "test:cita-proxima": "tsx src/tests/test-cita-proxima.ts",
+    "test:calculo-momento": "tsx src/tests/test-calculo-momento.ts",
+    "test:suite-completa": "tsx src/tests/test-suite-completa.ts",
+    "test:recordatorios-real": "tsx src/tests/test-recordatorios-real.ts",
+    "test:recordatorios-completo": "tsx src/tests/test-recordatorios-completo.ts",
+    "debug:hora-cita": "tsx src/tests/debug-hora-cita.ts",
+    "debug:recordatorios": "tsx src/tests/debug-recordatorios-detalle.ts",
+    "analisis:zona-horaria": "tsx src/tests/analisis-zona-horaria.ts",
+    "crear:cita-test": "tsx src/tests/crear-cita-test.ts",
+    "crear:cita-recordatorio": "tsx src/tests/crear-cita-recordatorio-proxima.ts"
   },
   "keywords": [
     "fastify",
@@ -23,17 +40,25 @@
   "dependencies": {
     "@fastify/cors": "^8.4.2",
     "@fastify/jwt": "^10.0.0",
-    "@prisma/client": "^5.7.1",
+    "@getbrevo/brevo": "^3.0.1",
+    "@imagekit/nodejs": "^7.1.1",
+    "@prisma/client": "^6.17.1",
+    "@react-email/components": "^0.5.7",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.3.1",
     "fastify": "^4.25.1",
+    "imagekitio-react": "^4.3.0",
     "jsonwebtoken": "^9.0.2",
-    "prisma": "^5.7.1"
+    "node-cron": "^4.2.1",
+    "prisma": "^6.17.1",
+    "react": "^19.2.0"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.10.6",
+    "@types/node-cron": "^3.0.11",
+    "@types/react": "^19.2.2",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   }

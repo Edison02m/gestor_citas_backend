@@ -55,13 +55,9 @@ export class UsuarioController {
     }
   };
 
-  /**
-   * PUT /api/usuarios/profile
-   * Actualizar perfil del usuario autenticado
-   */
   updateProfile = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const userId = (request as any).user.userId;  // CORREGIDO: userId en lugar de id
+      const userId = (request as any).user.userId;
       const dto = request.body as UpdateUsuarioDto;
 
       const usuario = await this.service.updateProfile(userId, dto);
@@ -80,69 +76,123 @@ export class UsuarioController {
   };
 
   /**
-   * GET /api/usuarios/:id
-   * Obtener usuario por ID (solo admin)
+   * PATCH /api/usuario/perfil
+   * Actualizar datos personales del usuario autenticado
    */
-  getById = async (request: FastifyRequest, reply: FastifyReply) => {
+  actualizarPerfil = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params as { id: string };
+      const usuarioId = (request as any).user.userId;
+      const { nombre, email } = request.body as {
+        nombre?: string;
+        email?: string;
+      };
 
-      const usuario = await this.service.getById(id);
+      // Validaciones básicas
+      if (nombre && nombre.trim().length < 2) {
+        return reply.status(400).send({
+          success: false,
+          message: 'El nombre debe tener al menos 2 caracteres',
+        });
+      }
 
-      return reply.status(200).send({
-        success: true,
-        data: usuario,
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return reply.status(400).send({
+          success: false,
+          message: 'El correo electrónico no es válido',
+        });
+      }
+
+      const resultado = await this.service.actualizarPerfil(usuarioId, {
+        nombre,
+        email,
       });
+
+      return reply.send(resultado);
     } catch (error: any) {
-      return reply.status(404).send({
+      console.error('Error en actualizarPerfil:', error);
+      
+      // Error específico para email duplicado
+      if (error.message === 'El correo electrónico ya está en uso') {
+        return reply.status(409).send({
+          success: false,
+          message: error.message,
+        });
+      }
+
+      return reply.status(400).send({
         success: false,
-        message: error.message || 'Usuario no encontrado',
+        message: error.message || 'Error al actualizar el perfil',
       });
     }
   };
 
   /**
-   * PUT /api/usuarios/:id
-   * Actualizar usuario (solo admin)
+   * PATCH /api/usuario/cambiar-password
+   * Cambiar contraseña del usuario autenticado
    */
-  update = async (request: FastifyRequest, reply: FastifyReply) => {
+  cambiarPassword = async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params as { id: string };
-      const dto = request.body as UpdateUsuarioDto;
+      const usuarioId = (request as any).user.userId;
+      const { passwordActual, passwordNueva, passwordNuevaConfirm } = request.body as {
+        passwordActual: string;
+        passwordNueva: string;
+        passwordNuevaConfirm: string;
+      };
 
-      const usuario = await this.service.update(id, dto);
+      // Validaciones
+      if (!passwordActual || !passwordNueva || !passwordNuevaConfirm) {
+        return reply.status(400).send({
+          success: false,
+          message: 'Todos los campos son requeridos',
+        });
+      }
 
-      return reply.status(200).send({
-        success: true,
-        data: usuario,
-        message: 'Usuario actualizado exitosamente',
-      });
+      if (passwordNueva !== passwordNuevaConfirm) {
+        return reply.status(400).send({
+          success: false,
+          message: 'Las contraseñas nuevas no coinciden',
+        });
+      }
+
+      if (passwordNueva.length < 8) {
+        return reply.status(400).send({
+          success: false,
+          message: 'La nueva contraseña debe tener al menos 8 caracteres',
+        });
+      }
+
+      // Validar requisitos de seguridad
+      const tieneNumero = /\d/.test(passwordNueva);
+      const tieneMayuscula = /[A-Z]/.test(passwordNueva);
+      
+      if (!tieneNumero || !tieneMayuscula) {
+        return reply.status(400).send({
+          success: false,
+          message: 'La contraseña debe contener al menos una mayúscula y un número',
+        });
+      }
+
+      const resultado = await this.service.cambiarPassword(
+        usuarioId,
+        passwordActual,
+        passwordNueva
+      );
+
+      return reply.send(resultado);
     } catch (error: any) {
+      console.error('Error en cambiarPassword:', error);
+      
+      // Manejar error de contraseña incorrecta
+      if (error.message.includes('contraseña actual es incorrecta')) {
+        return reply.status(401).send({
+          success: false,
+          message: error.message,
+        });
+      }
+
       return reply.status(400).send({
         success: false,
-        message: error.message || 'Error al actualizar usuario',
-      });
-    }
-  };
-
-  /**
-   * DELETE /api/usuarios/:id
-   * Eliminar usuario (solo admin)
-   */
-  delete = async (request: FastifyRequest, reply: FastifyReply) => {
-    try {
-      const { id } = request.params as { id: string };
-
-      await this.service.delete(id);
-
-      return reply.status(200).send({
-        success: true,
-        message: 'Usuario eliminado exitosamente',
-      });
-    } catch (error: any) {
-      return reply.status(400).send({
-        success: false,
-        message: error.message || 'Error al eliminar usuario',
+        message: error.message || 'Error al cambiar la contraseña',
       });
     }
   };

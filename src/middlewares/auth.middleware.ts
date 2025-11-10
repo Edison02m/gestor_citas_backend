@@ -33,6 +33,19 @@ export async function authMiddleware(
     // Agregar usuario al request
     request.user = decoded;
 
+    // Si es ADMIN_NEGOCIO, buscar su negocio
+    if (decoded.rol === 'ADMIN_NEGOCIO') {
+      const prisma = (await import('../database/prisma')).default;
+      const usuario = await prisma.usuario.findUnique({
+        where: { id: decoded.userId },
+        include: { negocio: { select: { id: true } } },
+      });
+
+      if (usuario?.negocio) {
+        (request.user as any).negocioId = usuario.negocio.id;
+      }
+    }
+
   } catch (error: any) {
     return reply.status(401).send({
       error: 'No autorizado',

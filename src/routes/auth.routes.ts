@@ -14,6 +14,8 @@ export async function authRoutes(fastify: FastifyInstance) {
 
   // Rutas públicas (sin autenticación)
   fastify.post('/login', controller.login);
+  fastify.post('/forgot-password', controller.forgotPassword);
+  fastify.post('/reset-password', controller.resetPassword);
 
   // Rutas protegidas (requieren autenticación)
   fastify.get('/me', {

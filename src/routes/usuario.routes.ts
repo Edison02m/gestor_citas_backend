@@ -12,15 +12,11 @@ export async function usuarioRoutes(fastify: FastifyInstance) {
   // ✅ Usar singleton de PrismaClient
   const usuarioRepository = new UsuarioRepository(prisma);
   const negocioRepository = new NegocioRepository(prisma);
-  const usuarioService = new UsuarioService(usuarioRepository, negocioRepository);
+  const usuarioService = new UsuarioService(usuarioRepository, negocioRepository, prisma);
   const usuarioController = new UsuarioController(usuarioService);
 
-  // Rutas públicas (sin autenticación)
   fastify.post('/register', usuarioController.register);
-  // NOTA: El login ahora está en /api/auth/login (unificado)
 
-  // Rutas protegidas (requieren solo autenticación, NO verifican suscripción)
-  // Estas rutas permiten ver/editar perfil incluso sin suscripción activa
   fastify.get(
     '/profile',
     { preHandler: [authMiddleware] },
@@ -33,22 +29,23 @@ export async function usuarioRoutes(fastify: FastifyInstance) {
     usuarioController.updateProfile
   );
 
-  // Rutas de administración (solo para testing o super admin)
-  fastify.get(
-    '/:id',
+  /**
+   * PATCH /api/usuario/perfil
+   * Actualizar datos personales del usuario autenticado
+   */
+  fastify.patch(
+    '/perfil',
     { preHandler: [authMiddleware] },
-    usuarioController.getById
+    usuarioController.actualizarPerfil
   );
 
-  fastify.put(
-    '/:id',
+  /**
+   * PATCH /api/usuario/cambiar-password
+   * Cambiar contraseña del usuario autenticado
+   */
+  fastify.patch(
+    '/cambiar-password',
     { preHandler: [authMiddleware] },
-    usuarioController.update
-  );
-
-  fastify.delete(
-    '/:id',
-    { preHandler: [authMiddleware] },
-    usuarioController.delete
+    usuarioController.cambiarPassword
   );
 }

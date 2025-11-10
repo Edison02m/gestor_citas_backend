@@ -9,12 +9,14 @@ export class UsuarioRepository {
    * Crear un usuario
    */
   async create(data: {
+    nombre: string;
     email: string;
     password: string;
     rol?: RolUsuario;
   }) {
     return await this.prisma.usuario.create({
       data: {
+        nombre: data.nombre,
         email: data.email,
         password: data.password,
         rol: data.rol || RolUsuario.ADMIN_NEGOCIO,
@@ -33,14 +35,13 @@ export class UsuarioRepository {
       where: { id },
       include: {
         negocio: {
-          select: {
-            id: true,
-            nombre: true,
-            telefono: true,
-            logo: true,
-            descripcion: true,
-            estadoSuscripcion: true,
-            codigoAplicado: true,
+          include: {
+            suscripcion: {
+              select: {
+                planPendiente: true,
+                fechaInicioPendiente: true,
+              },
+            },
           },
         },
       },
@@ -63,6 +64,7 @@ export class UsuarioRepository {
             descripcion: true,
             estadoSuscripcion: true,
             codigoAplicado: true,
+            reportesAvanzados: true,
           },
         },
       },
@@ -85,6 +87,7 @@ export class UsuarioRepository {
   async update(
     id: string,
     data: {
+      nombre?: string;
       email?: string;
       password?: string;
       activo?: boolean;
@@ -104,69 +107,6 @@ export class UsuarioRepository {
             codigoAplicado: true,
           },
         },
-      },
-    });
-  }
-
-  /**
-   * Eliminar usuario
-   */
-  async delete(id: string) {
-    return await this.prisma.usuario.delete({
-      where: { id },
-    });
-  }
-
-  /**
-   * Listar todos los usuarios
-   */
-  async findAll(filters?: {
-    rol?: RolUsuario;
-    activo?: boolean;
-    search?: string;
-  }) {
-    const where: any = {};
-
-    if (filters?.rol) {
-      where.rol = filters.rol;
-    }
-
-    if (filters?.activo !== undefined) {
-      where.activo = filters.activo;
-    }
-
-    if (filters?.search) {
-      where.OR = [
-        { email: { contains: filters.search, mode: 'insensitive' } },
-      ];
-    }
-
-    return await this.prisma.usuario.findMany({
-      where,
-      include: {
-        negocio: {
-          select: {
-            id: true,
-            nombre: true,
-            telefono: true,
-            estadoSuscripcion: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
-
-  /**
-   * Contar usuarios
-   */
-  async count(filters?: { rol?: RolUsuario; activo?: boolean }) {
-    return await this.prisma.usuario.count({
-      where: {
-        rol: filters?.rol,
-        activo: filters?.activo,
       },
     });
   }
