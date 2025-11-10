@@ -78,7 +78,7 @@ export class ServicioRepository {
     return await this.prisma.servicio.create({
       data: {
         nombre: data.nombre,
-        descripcion: data.descripcion,
+        descripcion: data.descripcion || '',
         duracion: data.duracion,
         precio: data.precio,
         foto: data.foto,
