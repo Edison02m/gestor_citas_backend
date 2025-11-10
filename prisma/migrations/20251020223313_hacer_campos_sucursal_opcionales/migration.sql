@@ -1,4 +1,0 @@
--- AlterTable
-ALTER TABLE "Sucursal" ALTER COLUMN "ciudad" DROP NOT NULL,
-ALTER COLUMN "provincia" DROP NOT NULL,
-ALTER COLUMN "email" DROP NOT NULL;

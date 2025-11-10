@@ -67,12 +67,27 @@ export class ReportesService {
       filtros.fechaFin = ultimoDiaMes.toISOString().split('T')[0];
     }
 
-    // Ejecutar todas las queries en paralelo
-    const [periodoActual, clientesFrecuentes, serviciosMasVendidos, citasPorDia] = await Promise.all([
+    // Ejecutar todas las queries en paralelo (incluyendo nuevas estadísticas)
+    const [
+      periodoActual,
+      clientesFrecuentes,
+      serviciosMasVendidos,
+      citasPorDia,
+      tasaUtilizacion,
+      ingresosPorHora,
+      rankingEmpleados,
+      horasPico,
+      valorVidaCliente,
+    ] = await Promise.all([
       this.repository.getDashboardStats(negocioId, filtros),
       this.repository.getClientesFrecuentes(negocioId, filtros, 10),
       this.repository.getServiciosMasVendidos(negocioId, filtros, 10),
       this.repository.getCitasPorDia(negocioId, filtros),
+      this.repository.getTasaUtilizacion(negocioId, filtros),
+      this.repository.getIngresosPorHora(negocioId, filtros),
+      this.repository.getRankingEmpleados(negocioId, filtros),
+      this.repository.getHorasPico(negocioId, filtros),
+      this.repository.getValorVidaCliente(negocioId, filtros),
     ]);
 
     // Calcular comparación con período anterior
@@ -107,6 +122,12 @@ export class ReportesService {
       clientesFrecuentes,
       serviciosMasVendidos,
       citasPorDia,
+      // Nuevas estadísticas
+      tasaUtilizacion,
+      ingresosPorHora: [ingresosPorHora], // Convertir a array para compatibilidad con interfaz
+      rankingEmpleados,
+      horasPico,
+      valorVidaCliente,
     };
   }
 

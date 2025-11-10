@@ -1,7 +1,7 @@
 import { UsuarioRepository } from '../repositories/usuario.repository';
 import { NegocioRepository } from '../repositories/negocio.repository';
 import { PrismaClient, PlanSuscripcion } from '@prisma/client';
-import { hashPassword } from '../utils/password.util';
+import { hashPassword, comparePassword } from '../utils/password.util';
 import {
   CreateUsuarioDto,
   UpdateUsuarioDto,
@@ -251,6 +251,136 @@ export class UsuarioService {
     }
 
     return this.toResponse(usuarioCompleto);
+  }
+
+  /**
+   * Actualizar datos personales del usuario
+   */
+  async actualizarPerfil(
+    usuarioId: string,
+    datos: { nombre?: string; email?: string }
+  ): Promise<{ success: boolean; data: any; message: string }> {
+    try {
+      // Validar que al menos un campo esté presente
+      if (!datos.nombre && !datos.email) {
+        throw new Error('Debe proporcionar al menos un campo para actualizar');
+      }
+
+      // Preparar datos de actualización
+      const datosActualizar: any = {};
+      
+      if (datos.nombre) {
+        datosActualizar.nombre = datos.nombre.trim();
+      }
+
+      if (datos.email) {
+        const emailTrim = datos.email.trim().toLowerCase();
+        
+        // Verificar que el email no esté en uso por otro usuario
+        const emailExistente = await this.prisma.usuario.findFirst({
+          where: {
+            email: emailTrim,
+            NOT: {
+              id: usuarioId
+            }
+          }
+        });
+
+        if (emailExistente) {
+          throw new Error('El correo electrónico ya está en uso');
+        }
+
+        datosActualizar.email = emailTrim;
+      }
+
+      // Actualizar usuario
+      const usuarioActualizado = await this.prisma.usuario.update({
+        where: { id: usuarioId },
+        data: datosActualizar,
+        include: {
+          negocio: {
+            select: {
+              id: true,
+              nombre: true,
+              logo: true,
+              descripcion: true,
+              telefono: true,
+              estadoSuscripcion: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        data: this.toResponse(usuarioActualizado),
+        message: 'Perfil actualizado correctamente',
+      };
+    } catch (error: any) {
+      console.error('Error actualizando perfil:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Cambiar contraseña del usuario
+   */
+  async cambiarPassword(
+    usuarioId: string,
+    passwordActual: string,
+    passwordNueva: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      // Obtener usuario con contraseña
+      const usuario = await this.prisma.usuario.findUnique({
+        where: { id: usuarioId },
+        select: {
+          id: true,
+          password: true,
+          nombre: true,
+          email: true,
+        },
+      });
+
+      if (!usuario) {
+        throw new Error('Usuario no encontrado');
+      }
+
+      // Verificar contraseña actual
+      const esPasswordValida = await comparePassword(passwordActual, usuario.password);
+      
+      if (!esPasswordValida) {
+        throw new Error('La contraseña actual es incorrecta');
+      }
+
+      // Validar que la nueva contraseña sea diferente
+      const esIgualAnterior = await comparePassword(passwordNueva, usuario.password);
+      if (esIgualAnterior) {
+        throw new Error('La nueva contraseña debe ser diferente a la actual');
+      }
+
+      // Validar requisitos de la nueva contraseña
+      if (passwordNueva.length < 8) {
+        throw new Error('La nueva contraseña debe tener al menos 8 caracteres');
+      }
+
+      // Hashear nueva contraseña
+      const hashedPassword = await hashPassword(passwordNueva);
+
+      // Actualizar contraseña
+      await this.prisma.usuario.update({
+        where: { id: usuarioId },
+        data: { password: hashedPassword },
+      });
+
+      return {
+        success: true,
+        message: 'Contraseña actualizada correctamente',
+      };
+    } catch (error: any) {
+      console.error('Error cambiando contraseña:', error);
+      throw error;
+    }
   }
 
   private toResponse(usuario: any): UsuarioResponse {

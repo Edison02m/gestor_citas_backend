@@ -1,12 +1,11 @@
 // prisma/schema.prisma
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["fullTextSearchPostgres"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "cockroachdb"
   url      = env("DATABASE_URL")
 }
 
@@ -129,7 +128,7 @@ model Negocio {
   whatsappInstanceId    String?   // ID de la instancia en Evolution (ej: "negocio_abc123")
   whatsappConnected     Boolean   @default(false) // Estado de conexión
   whatsappPhoneNumber   String?   // Número vinculado (ej: "593991234567")
-  whatsappQrCode        String?   @db.Text // QR Code base64 (temporal)
+  whatsappQrCode        String?   // QR Code base64 (temporal)
   whatsappConfiguredAt  DateTime? // Fecha de última configuración
 
   // RELACIONES
@@ -277,7 +276,7 @@ model Cliente {
   cedula   String
   telefono String
   email    String?
-  notas    String? @db.Text
+  notas    String?
 
   // Relación con negocio
   negocio   Negocio @relation(fields: [negocioId], references: [id], onDelete: Cascade)
@@ -440,7 +439,7 @@ enum EstadoSucursal {
 model Servicio {
   id          String         @id @default(uuid())
   nombre      String
-  descripcion String         @db.Text
+  descripcion String
   duracion    Int // Duración en minutos
   precio      Decimal        @db.Decimal(10, 2)
   foto        String?
@@ -481,7 +480,7 @@ model Cita {
   horaFin    String   // Hora en formato "HH:mm" ("10:00")
 
   estado      EstadoCita  @default(PENDIENTE)
-  notas       String?     @db.Text
+  notas       String?
   precioTotal Decimal     @db.Decimal(10, 2)
   canalOrigen CanalOrigen @default(MANUAL)
 
@@ -666,7 +665,7 @@ enum TipoEnvio {
 model ConfiguracionGlobal {
   id          String  @id @default(uuid())
   clave       String  @unique
-  valor       String  @db.Text
+  valor       String
   tipo        String // STRING, NUMBER, BOOLEAN, JSON
   descripcion String?
 

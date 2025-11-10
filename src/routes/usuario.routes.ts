@@ -28,4 +28,24 @@ export async function usuarioRoutes(fastify: FastifyInstance) {
     { preHandler: [authMiddleware] },
     usuarioController.updateProfile
   );
+
+  /**
+   * PATCH /api/usuario/perfil
+   * Actualizar datos personales del usuario autenticado
+   */
+  fastify.patch(
+    '/perfil',
+    { preHandler: [authMiddleware] },
+    usuarioController.actualizarPerfil
+  );
+
+  /**
+   * PATCH /api/usuario/cambiar-password
+   * Cambiar contraseña del usuario autenticado
+   */
+  fastify.patch(
+    '/cambiar-password',
+    { preHandler: [authMiddleware] },
+    usuarioController.cambiarPassword
+  );
 }

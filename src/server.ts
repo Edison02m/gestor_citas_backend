@@ -22,6 +22,7 @@ import { reportesRoutes } from './routes/reportes.routes';
 import { imagekitRoutes } from './routes/imagekit.routes';
 import planesScheduler from './services/planes-scheduler.service';
 import recordatoriosScheduler from './services/recordatorios-scheduler.service';
+import keepAliveService from './services/keep-alive.service';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -37,9 +38,24 @@ app.register(cors, {
   credentials: true,
 });
 
-// Ruta de prueba
+// Ruta de prueba y health check
 app.get('/health', async () => {
-  return { status: 'OK', message: 'Server is running' };
+  return { 
+    status: 'OK', 
+    message: 'Server is running',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  };
+});
+
+// Endpoint de ping manual para keep-alive (opcional - para testing)
+app.get('/ping', async () => {
+  const result = await keepAliveService.pingManual();
+  return {
+    message: 'Manual ping executed',
+    ...result,
+    timestamp: new Date().toISOString()
+  };
 });
 
 // ============================================================================
@@ -118,6 +134,9 @@ const start = async () => {
     
     // 📅 Iniciar scheduler de recordatorios automáticos
     recordatoriosScheduler.iniciar();
+    
+    // 🔄 Iniciar keep-alive para mantener activo Render y la BD
+    keepAliveService.iniciar();
   } catch (err) {
     app.log.error(err);
     process.exit(1);

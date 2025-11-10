@@ -123,6 +123,80 @@ export interface CitasPorDiaSemana {
 }
 
 // ============================================================================
+// NUEVAS ESTADÍSTICAS - PRIORIDAD ALTA
+// ============================================================================
+
+// 1. Tasa de Utilización de Horarios
+export interface TasaUtilizacion {
+  empleadoId?: string;
+  empleadoNombre?: string;
+  sucursalId?: string;
+  sucursalNombre?: string;
+  horasDisponibles: number; // Total de horas disponibles según horarios
+  horasTrabajadas: number; // Horas realmente trabajadas (suma duración citas)
+  tasaUtilizacion: number; // (horasTrabajadas / horasDisponibles) * 100
+  citasTotales: number;
+  espaciosVacios: number; // Huecos mayores a 30 min
+}
+
+// 2. Ingresos por Hora
+export interface IngresosPorHora {
+  empleadoId?: string;
+  empleadoNombre?: string;
+  ingresoTotal: number;
+  horasTrabajadas: number;
+  ingresoPorHora: number;
+  mejorDia: { dia: string; ingreso: number };
+  mejorHorario: { hora: string; ingreso: number };
+  tendencia: 'creciente' | 'estable' | 'decreciente';
+}
+
+// 3. Ranking de Empleados
+export interface RankingEmpleado {
+  posicion: number;
+  empleadoId: string;
+  nombre: string;
+  foto?: string;
+  cargo: string;
+  totalCitas: number;
+  ingresoGenerado: number;
+  tasaCompletacion: number; // (citasCompletadas / totalCitas) * 100
+  tasaUtilizacion: number;
+  ingresoPorHora: number;
+  calificacionPromedio?: number; // Para futuro
+  puntuacionTotal: number; // Score combinado para ranking
+}
+
+// 4. Horas/Días Pico
+export interface HorasPico {
+  diaMasConcurrido: string; // "Viernes"
+  diaMasConcurridoCitas: number;
+  horaMasConcurrida: string; // "14:00"
+  horaMasConcurridaCitas: number;
+  citasPorDia: { dia: string; citas: number; ingresos: number }[];
+  citasPorHora: { hora: string; citas: number; ingresos: number }[];
+  horasMenosConcurridas: string[];
+  recomendaciones?: string[]; // Sugerencias de optimización
+}
+
+// 5. Valor de Vida del Cliente (CLV)
+export interface ValorVidaCliente {
+  clv: number; // Promedio de ingresos por cliente
+  clientesTotales: number;
+  clientesNuevos: number; // Primera cita en este periodo
+  clientesRecurrentes: number; // Con citas previas
+  tasaRetencion: number; // (clientesRecurrentes / clientesTotales) * 100
+  frecuenciaPromedio: number; // Citas promedio por cliente
+  ticketPromedio: number; // Gasto promedio por cita
+  topClientes: {
+    clienteId: string;
+    nombre: string;
+    totalGastado: number;
+    totalCitas: number;
+  }[];
+}
+
+// ============================================================================
 // Response Completo del Dashboard
 // ============================================================================
 
@@ -131,4 +205,10 @@ export interface DashboardReportesResponse {
   clientesFrecuentes: ClienteFrecuente[];
   serviciosMasVendidos: ServicioVendido[];
   citasPorDia: DatoTemporal[];
+  // NUEVAS ESTADÍSTICAS
+  tasaUtilizacion?: TasaUtilizacion[];
+  ingresosPorHora?: IngresosPorHora[];
+  rankingEmpleados?: RankingEmpleado[];
+  horasPico?: HorasPico;
+  valorVidaCliente?: ValorVidaCliente;
 }
