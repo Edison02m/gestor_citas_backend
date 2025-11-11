@@ -38,6 +38,21 @@ app.register(cors, {
   credentials: true,
 });
 
+// Ruta raíz - información del servicio
+app.get('/', async () => {
+  return {
+    service: 'CitaYA Backend API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+      docs: 'https://citaya.site'
+    },
+    timestamp: new Date().toISOString()
+  };
+});
+
 // Ruta de prueba y health check
 app.get('/health', async () => {
   return { 
