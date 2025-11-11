@@ -1,6 +1,6 @@
 /**
  * Servicio de Keep-Alive para mantener activo el servidor en Render
- * y la conexión con la base de datos CockroachDB
+ * Hace ping HTTP externo (no solo BD) para evitar spin-down en plan gratuito
  */
 
 import cron from 'node-cron';
@@ -9,6 +9,7 @@ import prisma from '../database/prisma';
 class KeepAliveService {
   private isRunning = false;
   private cronJob: any = null;
+  private backendUrl = process.env.RENDER_EXTERNAL_URL || 'https://citaya-backend.onrender.com';
 
   /**
    * Inicia el servicio de keep-alive
@@ -20,13 +21,10 @@ class KeepAliveService {
       return;
     }
 
-    // Solo ejecutar en producción (Render)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('ℹ️  Keep-Alive desactivado en desarrollo');
-      return;
-    }
-
-    console.log('🔄 Iniciando servicio Keep-Alive...');
+    // Ejecutar en producción (Render) Y en desarrollo para testing
+    const enProduccion = process.env.NODE_ENV === 'production';
+    
+    console.log(`🔄 Iniciando servicio Keep-Alive (${enProduccion ? 'PRODUCCIÓN' : 'DESARROLLO'})...`);
     
     // Ejecutar cada 10 minutos (cron: minuto hora * * *)
     this.cronJob = cron.schedule('*/10 * * * *', async () => {
@@ -35,6 +33,10 @@ class KeepAliveService {
 
     this.isRunning = true;
     console.log('✅ Keep-Alive iniciado - Ping cada 10 minutos');
+    
+    if (enProduccion) {
+      console.log(`📡 URL de ping: ${this.backendUrl}/health`);
+    }
   }
 
   /**
@@ -49,21 +51,44 @@ class KeepAliveService {
   }
 
   /**
-   * Ejecuta un ping a la base de datos
-   * Query simple y ligera para mantener la conexión activa
+   * Ejecuta ping HTTP al propio servidor (previene spin-down en Render)
+   * Y también ping a la base de datos
    */
   private async ping() {
+    const enProduccion = process.env.NODE_ENV === 'production';
+    
     try {
       const startTime = Date.now();
       
-      // Query super simple: contar registros de SuperAdmin
+      // 1. Ping HTTP externo (CRÍTICO para prevenir spin-down en Render)
+      if (enProduccion) {
+        try {
+          const httpResponse = await fetch(`${this.backendUrl}/health`);
+          const httpDuration = Date.now() - startTime;
+          
+          if (httpResponse.ok) {
+            console.log(`🌐 Keep-Alive HTTP ping exitoso (${httpDuration}ms)`);
+          } else {
+            console.warn(`⚠️  HTTP ping con status: ${httpResponse.status}`);
+          }
+        } catch (httpError: any) {
+          console.error('❌ Error en HTTP ping:', httpError.message);
+        }
+      }
+      
+      // 2. Ping a base de datos (mantiene conexión activa)
+      const dbStartTime = Date.now();
       const count = await prisma.superAdmin.count();
+      const dbDuration = Date.now() - dbStartTime;
       
-      const duration = Date.now() - startTime;
+      console.log(`🗄️  Keep-Alive DB ping exitoso (${dbDuration}ms) - SuperAdmins: ${count}`);
       
-      console.log(`🏓 Keep-Alive ping exitoso (${duration}ms) - SuperAdmins: ${count}`);
-      
-      return { success: true, duration, count };
+      return { 
+        success: true, 
+        httpPing: enProduccion,
+        dbDuration,
+        count 
+      };
     } catch (error: any) {
       console.error('❌ Error en Keep-Alive ping:', error.message);
       return { success: false, error: error.message };
